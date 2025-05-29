@@ -1,0 +1,438 @@
+:root {
+    --neon-pink: #FF00FF;
+    --electric-blue: #00FFFF;
+    --acid-green: #39FF14;
+    --dark-bg: #0A0A1A;
+    --text-color: #E0E0E0;
+    --container-bg: rgba(10, 10, 20, 0.85); 
+    --border-color: var(--electric-blue);
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: url('https://i.postimg.cc/8P34RGJT/Chat-GPT-Image-26-2025-19-50-54.png') center center no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    background-color: var(--dark-bg); 
+    color: var(--text-color); 
+    overscroll-behavior-y: contain; 
+    min-height: 100vh;
+    margin: 0; /* Added to ensure no default body margin */
+}
+
+.app-container {
+    max-width: 420px; 
+    min-height: 100vh;
+    margin: 0 auto;
+    background-color: var(--container-bg); 
+    backdrop-filter: blur(8px); 
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3); 
+    border: 1px solid rgba(0, 255, 255, 0.2);
+}
+
+.header {
+    background-color: rgba(10, 10, 20, 0.9); 
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+    font-family: 'Share Tech Mono', monospace;
+}
+.header-item {
+    background-color: rgba(0, 255, 255, 0.1);
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 5px var(--border-color);
+}
+.header-item span { color: var(--acid-green); }
+
+
+.tap-capsule-wrapper {
+    position: relative; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 10px 0 5px 0; 
+    min-height: 320px; 
+}
+
+.tap-capsule-img { 
+    width: 300px; 
+    height: auto;
+    max-height: 400px; 
+    transition: transform 0.1s ease-in-out, filter 0.2s;
+    animation: glowPulsePunk 2.5s infinite ease-in-out;
+    cursor: pointer;
+    user-select: none; 
+    -webkit-user-drag: none; 
+}
+.tap-capsule-img:active {
+    transform: scale(0.95) rotate(2deg);
+    filter: drop-shadow(0 0 35px var(--neon-pink)) drop-shadow(0 0 20px var(--electric-blue));
+}
+
+@keyframes glowPulsePunk {
+    0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 15px var(--electric-blue)) drop-shadow(0 0 8px var(--neon-pink)); }
+    50% { transform: scale(1.05) rotate(-1deg); filter: drop-shadow(0 0 30px var(--neon-pink)) drop-shadow(0 0 15px var(--electric-blue)); }
+    100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 15px var(--electric-blue)) drop-shadow(0 0 8px var(--neon-pink)); }
+}
+
+.tap-feedback {
+    position: absolute; 
+    top: 25%; 
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 48px; 
+    font-weight: bold;
+    color: var(--electric-blue); 
+    text-shadow: 0 0 8px var(--electric-blue), 0 0 15px var(--electric-blue); 
+    pointer-events: none;
+    opacity: 1;
+    animation: fadeUp 0.8s ease-out forwards;
+}
+
+@keyframes fadeUp { 
+    0% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -50px); } 
+}
+
+
+.tap-info {
+    text-align: center;
+    color: var(--text-color);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    margin-top: 0px; 
+    margin-bottom: 10px; 
+    text-shadow: 0 0 5px var(--neon-pink);
+}
+
+.passive-ui {
+  text-align: center;
+  color: var(--electric-blue); 
+  font-family: 'Share Tech Mono', monospace;
+  font-weight: 600;
+  margin-top: 5px; 
+  font-size: 1rem;
+  text-shadow: 0 0 5px var(--electric-blue);
+}
+
+.bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    background-color: rgba(10, 10, 20, 0.95); 
+    padding: 10px 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.nav-button {
+    background-color: transparent;
+    color: var(--electric-blue);
+    border: 1px solid transparent;
+    padding: 8px 10px; 
+    font-size: 0.75rem; 
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 0; 
+    transition: all 0.2s;
+    flex-grow: 1; 
+    text-align: center; 
+    text-transform: uppercase;
+}
+.nav-button:hover {
+    background-color: rgba(0, 255, 255, 0.1);
+    color: #FFFFFF;
+    border-color: var(--electric-blue);
+    text-shadow: 0 0 8px var(--electric-blue);
+}
+.nav-button.active {
+    background-color: var(--electric-blue); 
+    color: var(--dark-bg);
+    font-weight: 700;
+    border-color: var(--electric-blue);
+    box-shadow: 0 0 10px var(--electric-blue);
+}
+
+.tab-content {
+    padding: 20px;
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex; 
+    flex-direction: column; 
+}
+#tapTab {
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-content h2 {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--neon-pink); 
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-align: center;
+    text-shadow: 0 0 10px var(--neon-pink);
+}
+ .tab-content h3 { 
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--electric-blue);
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 8px;
+}
+.tab-content p, .tab-content li {
+    color: var(--text-color);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+.list-item {
+    background-color: rgba(10, 10, 20, 0.7); 
+    padding: 12px;
+    border-radius: 4px; 
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 0 8px rgba(0, 255, 255, 0.2);
+}
+.list-item strong {
+    color: var(--neon-pink);
+}
+
+#messageBox {
+    position: fixed;
+    bottom: 70px; 
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--neon-pink);
+    color: var(--dark-bg);
+    font-family: 'Share Tech Mono', monospace;
+    padding: 10px 18px;
+    border-radius: 2px;
+    border: 1px solid var(--dark-bg);
+    box-shadow: 0 0 15px var(--neon-pink);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    font-size: 0.9rem;
+}
+#messageBox.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-10px);
+    pointer-events: auto;
+}
+
+.inventory-item img {
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+    object-fit: contain;
+    border-radius: 50%;
+    border: 1px solid var(--electric-blue);
+}
+.inventory-item {
+    display: flex;
+    align-items: center;
+    background-color: rgba(10, 10, 20, 0.8); 
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border-color);
+}
+
+#cooldownTimerDisplay {
+    font-size: 1rem;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--neon-pink); 
+    text-align: center;
+    margin-top: 10px;
+    text-shadow: 0 0 5px var(--neon-pink);
+    min-height: 1.2em; 
+}
+
+#capsuleDropModal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(10, 0, 20, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease-in-out;
+}
+#capsuleDropModal.visible { opacity: 1; pointer-events: auto; }
+.capsule-drop-content {
+    background: linear-gradient(145deg, #1a1a2e, #16213e);
+    padding: 30px; border-radius: 8px; text-align: center; 
+    border: 2px solid var(--neon-pink);
+    box-shadow: 0 0 40px var(--neon-pink), inset 0 0 15px rgba(0,255,255,0.3);
+    transform: scale(0.7); opacity: 0;
+    animation: dropInAnimationPunk 0.5s 0.1s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    width: 90%; max-width: 380px;
+}
+
+#droppedCapsuleImage { 
+    display: block; margin: 0 auto 15px auto; 
+    width: 120px; height: auto; max-height: 190px; 
+    animation: spinAndGlowDropPunk 1.5s ease-in-out infinite alternate;
+}
+#droppedCapsuleInfo { font-size: 1.4rem; color: var(--neon-pink); font-weight: 700; margin-bottom: 8px; font-family: 'Share Tech Mono', monospace; }
+#droppedCapsuleQuote { font-size: 0.9rem; color: var(--electric-blue); font-style: italic; margin-bottom: 8px; min-height: 20px; } 
+#droppedCapsuleBonus { font-size: 1rem; color: var(--acid-green); font-weight: 600; }
+#closeDropModalButton {
+    background: linear-gradient(45deg, var(--neon-pink), var(--electric-blue));
+    color: var(--dark-bg);
+    padding: 12px 25px; border: none; border-radius: 4px;
+    font-weight: 700; font-family: 'Share Tech Mono', monospace; cursor: pointer;
+    margin-top: 25px; transition: all 0.2s; text-transform: uppercase;
+    box-shadow: 0 0 15px var(--neon-pink);
+}
+#closeDropModalButton:hover { background-position: right center; box-shadow: 0 0 25px var(--neon-pink), 0 0 15px var(--electric-blue); transform: scale(1.05); }
+
+@keyframes dropInAnimationPunk {
+    to { transform: scale(1) rotate(-2deg); opacity: 1; }
+}
+@keyframes spinAndGlowDropPunk {
+    0% { transform: rotateY(-10deg) scale(1) translateX(-5px); filter: drop-shadow(0 0 15px var(--neon-pink)) drop-shadow(0 0 8px var(--electric-blue)); }
+    100% { transform: rotateY(10deg) scale(1.05) translateX(5px); filter: drop-shadow(0 0 30px var(--electric-blue)) drop-shadow(0 0 15px var(--neon-pink)); }
+}
+
+.btn-claim-daily { 
+    background: linear-gradient(135deg, var(--neon-pink), var(--electric-blue));
+    color: var(--dark-bg); padding: 10px 18px; border-radius: 4px;
+    font-weight: 700; font-family: 'Share Tech Mono', monospace; text-align: center;
+    transition: all 0.2s; box-shadow: 0 0 10px var(--neon-pink);
+    display: block; margin: 15px auto; text-transform: uppercase;
+}
+.btn-claim-daily:hover:not(:disabled) {
+    box-shadow: 0 0 20px var(--neon-pink), 0 0 10px var(--electric-blue);
+    transform: translateY(-2px) scale(1.03);
+}
+.btn-claim-daily:disabled {
+    background: #2c2f33; border: 1px solid #40444B; color: #777;
+    cursor: not-allowed; opacity: 0.7; box-shadow: none;
+}
+
+.invite-section { margin-bottom: 25px; }
+.invite-section p { margin-bottom: 5px; }
+.invite-link-container { display: flex; align-items: center; margin-bottom: 10px; }
+.invite-link-container input[type="text"] {
+    flex-grow: 1; background-color: rgba(10,10,20,0.9); color: var(--text-color);
+    border: 1px solid var(--border-color); padding: 10px; 
+    border-radius: 4px 0 0 4px; font-size: 0.9rem; font-family: 'Share Tech Mono', monospace;
+}
+.invite-link-container button {
+    background-color: var(--neon-pink); color: var(--dark-bg); border: none;
+    padding: 11px 15px; border-radius: 0 4px 4px 0; cursor: pointer;
+    font-size: 0.9rem; font-family: 'Share Tech Mono', monospace; text-transform: uppercase;
+}
+#enterReferralCodeInput {
+     background-color: rgba(10,10,20,0.9); color: var(--text-color);
+    border: 1px solid var(--border-color); padding: 10px;
+    border-radius: 4px; font-size: 0.9rem; font-family: 'Share Tech Mono', monospace;
+    width: calc(100% - 110px); 
+    margin-right: 10px;
+}
+#confirmReferralCodeButton {
+    background-color: var(--acid-green); color: var(--dark-bg); border: none;
+    padding: 11px 15px; border-radius: 4px; cursor: pointer;
+    font-size: 0.9rem; font-family: 'Share Tech Mono', monospace; text-transform: uppercase;
+}
+#referralStatusMessage {
+    margin-top: 10px;
+    font-style: italic;
+    color: var(--electric-blue);
+}
+
+.daily-rewards-grid {
+    display: grid;
+    grid-template-columns: 1fr; 
+    gap: 8px;
+    margin-top: 15px;
+}
+.daily-reward-item {
+    background-color: rgba(10, 10, 20, 0.85);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    font-family: 'Share Tech Mono', monospace;
+}
+.daily-reward-item .day {
+    font-size: 1.1rem;
+    color: var(--neon-pink);
+    margin-right: 10px; 
+}
+.daily-reward-item .reward {
+    font-size: 1rem; 
+    color: var(--acid-green);
+    text-align: right; 
+}
+.daily-reward-item.claimed {
+    background-color: rgba(20, 20, 30, 0.7);
+    border-color: #40444B;
+    opacity: 0.6;
+}
+ .daily-reward-item.available-to-claim {
+    border: 2px solid var(--acid-green);
+    box-shadow: 0 0 10px var(--acid-green);
+}
+
+/* Language Selection Modal */
+#languageModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.9);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000; /* Highest z-index */
+    color: var(--text-color);
+}
+#languageModal h2 {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--neon-pink);
+    font-size: 2rem;
+    margin-bottom: 30px;
+    text-shadow: 0 0 10px var(--neon-pink);
+}
+.language-button {
+    background: linear-gradient(135deg, var(--neon-pink), var(--electric-blue));
+    color: var(--dark-bg);
+    padding: 15px 30px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-family: 'Share Tech Mono', monospace;
+    text-align: center;
+    transition: all 0.2s;
+    box-shadow: 0 0 15px var(--neon-pink);
+    margin: 10px;
+    cursor: pointer;
+    min-width: 200px;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+}
+.language-button:hover {
+    box-shadow: 0 0 25px var(--neon-pink), 0 0 15px var(--electric-blue);
+    transform: translateY(-2px) scale(1.03);
+}
+
+.discord-mode {
+  overflow-y: auto;
+  height: 100vh;
+  background-color: #0A0A1A;
+}

@@ -1,0 +1,33 @@
+{
+  "functions": {
+    "source": "functions"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self' https://phonetapds.web.app; frame-ancestors https://discord.com https://*.discordsays.com; script-src 'self' https://phonetapds.web.app https://apis.google.com https://www.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://*.googleapis.com 'unsafe-inline'; style-src 'self' https://phonetapds.web.app https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' https://phonetapds.web.app data: https://i.postimg.cc; connect-src 'self' https://phonetapds.web.app wss://*.firebaseio.com https://*.googleapis.com https://securetoken.googleapis.com https://us-central1-phonetapds.cloudfunctions.net; frame-src 'self' https://*.firebaseapp.com https://*.recaptcha.net;"
+          }
+        ]
+      },
+      {
+        "source": "**/*.js",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self';"
+          }
+        ]
+      }
+    ]
+  }
+}

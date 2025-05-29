@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://cdn.tailwindcss.com;">
+ <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PhoneTap - Tap to Earn</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body class="overflow-hidden">
+
+    <div id="languageModal">
+        <h2>CHOOSE YOUR LANGUAGE / ВЫБЕРИТЕ ЯЗЫК</h2>
+        <button class="language-button" data-lang="en">ENGLISH</button>
+        <button class="language-button" data-lang="ru">РУССКИЙ</button>
+    </div>
+
+    <div class="app-container" style="display: none;">
+        <div class="header">
+            <div class="header-item">⚡ <span data-translate-key="energy_header">Energy</span>: <span id="energyValue">200</span>/<span id="maxEnergyDisplay">200</span></div>
+            <div class="header-item">💰 <span data-translate-key="coins_header">Coins</span>: <span id="coinsDisplay">0</span></div>
+            <div class="header-item">🏆 <span data-translate-key="rank_header">Rank</span>: <span id="rankDisplay">N/A</span></div>
+        </div>
+
+        <div id="mainContent" class="flex-grow flex flex-col overflow-hidden">
+            <div id="tapTab" class="tab-content">
+                <div id="tapCapsule" class="tap-capsule-wrapper">
+                    <img src="https://i.postimg.cc/LXJkVrmF/Chat-GPT-Image-26-2025-18-53-50.png"
+                         alt="Tap Capsule"
+                         class="tap-capsule-img"
+                         draggable="false"
+                         onerror="this.onerror=null;this.src='https://placehold.co/300x400/0A0A1A/FF00FF?text=CAPSULE_ERROR&font=Share+Tech+Mono';this.alt='Error loading capsule image';" />
+                </div>
+                <div id="passive-rate" class="passive-ui" data-translate-key="passive_income_rate_display_template" data-translate-value="0">+0 coins/hour</div>
+                <p class="tap-info" data-translate-key="tap_the_capsule">TAP THE VOID CAPSULE!</p>
+                <div id="cooldownTimerDisplay"></div>
+            </div>
+
+            <div id="inventoryTab" class="tab-content hidden">
+                <h2 data-translate-key="inventory_title">DATA VAULT // CAPSULES</h2>
+                <div id="capsuleList" class="space-y-2 mb-4"></div>
+                <div class="list-item">
+                    <strong data-translate-key="passive_income_label">PASSIVE STREAM:</strong> <span id="passiveIncomeDisplay">0</span> <span data-translate-key="coins_per_hour_suffix">COINS/HR</span>
+                </div>
+                 <p class="text-xs text-gray-400 mt-2 font-mono" data-translate-key="passive_income_note">Income stream auto-updates hourly.</p>
+            </div>
+
+            <div id="leaderboardTab" class="tab-content hidden">
+                <h2 data-translate-key="leaderboard_title">VOID RANKINGS // DAILY</h2>
+                <div id="leaderboardDisplay" class="space-y-1 text-sm"></div>
+                 <p class="text-xs text-gray-400 mt-2 font-mono" data-translate-key="leaderboard_reset_note">Rankings reset 00:00 UTC.</p>
+            </div>
+
+            <div id="inviteTab" class="tab-content hidden">
+                <h2 data-translate-key="invite_title">NETWORK // INVITE AGENTS</h2>
+                <div class="invite-section">
+                    <p data-translate-key="your_invite_code_label">Your Unique Agent ID:</p>
+                    <div class="invite-link-container">
+                        <input type="text" id="playerInviteCodeDisplay" value="Loading..." readonly>
+                        <button id="copyInviteCodeButton" data-translate-key="copy_button_id">COPY ID</button>
+                    </div>
+                </div>
+
+                <div id="enterReferralCodeSection" class="invite-section">
+                    <p data-translate-key="referral_enter_code_label">Enter Agent ID of your Referrer:</p>
+                    <div class="invite-link-container">
+                        <input type="text" id="enterReferralCodeInput" data-placeholder-key="referral_enter_placeholder" placeholder="AGENT_ID_HERE">
+                        <button id="confirmReferralCodeButton" data-translate-key="confirm_button">CONFIRM</button>
+                    </div>
+                </div>
+                <p id="referralStatusMessage"></p>
+
+                <div class="invite-info mt-6">
+                     <p class="mt-2"><span data-translate-key="activated_referrals_label">Activated Referrals</span>: <span id="activatedReferralsCount">0</span></p>
+                    <p class="mt-4"><strong data-translate-key="your_rewards_label_referrer">YOUR REWARDS (as Referrer):</strong></p>
+                    <p data-translate-key="referrer_bonus_manual_code">💸 +200 COINS // <span class="font-bold text-neon-pink">YOU</span> // WHEN YOUR REFERRED AGENT ENTERS YOUR CODE.</p>
+                    <p class="text-sm text-gray-400" data-translate-key="backend_needed_note">(This reward is simulated client-side. Backend needed for actual cross-user rewards.)</p>
+                    <p data-translate-key="referrer_bonus_200_taps">💸 +100 COINS // <span class="font-bold text-neon-pink">YOU</span> // WHEN YOUR REFERRED AGENT COMPLETES 200 TAPS.</p>
+                    <p class="text-sm text-gray-400" data-translate-key="backend_needed_note_2">(Simulated. Backend needed.)</p>
+                    <p data-translate-key="referrer_bonus_10_percent">⚡ +10% OF THEIR ACQUIRED ASSETS // <span class="font-bold text-neon-pink">FOREVER</span>.</p>
+                    <p class="text-sm text-gray-400" data-translate-key="backend_needed_note_3">(This feature requires a dedicated backend server for tracking & distribution.)</p>
+
+                    <p class="mt-4"><strong data-translate-key="your_rewards_label_referee">YOUR BONUS (as Referee):</strong></p>
+                    <p data-translate-key="referee_bonus_url">🎁 +25 COINS INSTANTLY // JOINING VIA URL LINK!</p>
+                    <p data-translate-key="referee_bonus_manual_code">🎁 +100 COINS INSTANTLY // MANUALLY ENTERING A REFERRER'S CODE!</p>
+                </div>
+            </div>
+
+            <div id="tasksTab" class="tab-content hidden">
+                <h3 data-translate-key="tasks_title_daily_cache">DAILY CACHE</h3>
+                <div id="dailyClaimGrid" class="daily-rewards-grid"></div>
+                <div id="dailyClaimSection" class="mt-4 text-center">
+                    <p id="dailyClaimStatus" class="mb-2 font-mono" data-translate-key="daily_cache_status_checking">SCANNING CACHE STATUS...</p>
+                    <button id="claimDailyRewardButton" class="btn-claim-daily" disabled data-translate-key="daily_cache_button_claim_template">ACCESS CACHE (DAY X)</button>
+                </div>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <button class="nav-button active" data-tab="tapTab" data-translate-key="nav_tap">TAP</button>
+            <button class="nav-button" data-tab="inventoryTab" data-translate-key="nav_vault">VAULT</button>
+            <button class="nav-button" data-tab="leaderboardTab" data-translate-key="nav_ranks">RANKS</button>
+            <button class="nav-button" data-tab="inviteTab" data-translate-key="nav_network">NETWORK</button>
+            <button class="nav-button" data-tab="tasksTab" data-translate-key="nav_tasks">TASKS</button>
+        </nav>
+    </div>
+
+    <div id="messageBox">Sample Message</div>
+
+    <div id="capsuleDropModal">
+        <div class="capsule-drop-content">
+            <img id="droppedCapsuleImage" src="" alt="Dropped Capsule">
+            <p id="droppedCapsuleInfo" data-translate-key="capsule_drop_title_template">ARTIFACT ACQUIRED!</p>
+            <p id="droppedCapsuleQuote">A mysterious energy emanates from it...</p>
+            <p id="droppedCapsuleBonus" data-translate-key="capsule_drop_bonus_template_raw">+X coins/hr</p>
+            <button id="closeDropModalButton" data-translate-key="capsule_drop_close_button">LOG IT!</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
+
+    <script src="/localization.js"></script>
+    <script src="/config.js"></script>
+    <script src="/game.js"></script>
+
+</body>
+</html>
