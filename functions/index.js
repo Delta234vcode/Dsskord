@@ -1,106 +1,128 @@
+const path = require("path");
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
+const session = require("express-session");
+const passport = require("passport");
+const authRoutes = require("./auth");
 
-const app = express();
+const app = express(); // ✅ створення app
 const PORT = process.env.PORT || 3000;
 
+const userStates = {};
+
+
+// Middleware (один раз, зверху!)
 app.use(cors({
-  origin: "https://phonetapds.web.app", // або твій хостинг
+  origin: "https://phonetapds.web.app", // змінити на свій домен
   methods: ["GET", "POST"],
 }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
+// Ініціалізація сесій та passport
+app.use(session({
+  secret: "keyboard cat", // 🔐 обов'язково заміни у продакшн
+  resave: false,
+  saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
-const userStates = {}; // Просте зберігання в RAM
+// Авторизація через Discord
+app.use("/auth", authRoutes);
 
-// 🟢 TAP endpoint
+// ================== ROUTES ===================
+
+// /tap
 app.post("/tap", (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
+    const { userId, coins } = req.body;
+    if (!userId || typeof coins !== "number") {
+      return res.status(400).json({ success: false, message: "Missing userId or coins" });
+    }
 
-    const reward = Math.floor(Math.random() * 5) + 1;
-    if (!userStates[userId]) userStates[userId] = { coins: 0, capsules: [] };
+    if (!userStates[userId]) {
+      userStates[userId] = { coins: 0, capsules: [], lastClaim: 0, referredBy: null };
+    }
 
-    userStates[userId].coins += reward;
-    res.json({ success: true, coins: reward, newBalance: userStates[userId].coins });
+    userStates[userId].coins += coins;
+    return res.json({ success: true, coins: userStates[userId].coins });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Internal error", error: error.message });
+    console.error("Error in /tap:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
-// 🎁 Daily Claim endpoint
+// /claim
 app.post("/claim", (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
+    const { userId, reward } = req.body;
+    if (!userId || typeof reward !== "number") {
+      return res.status(400).json({ success: false, message: "Missing userId or reward" });
+    }
 
-    const reward = 25;
-    if (!userStates[userId]) userStates[userId] = { coins: 0, capsules: [] };
+    if (!userStates[userId]) {
+      userStates[userId] = { coins: 0, capsules: [], lastClaim: 0, referredBy: null };
+    }
 
     userStates[userId].coins += reward;
-    res.json({ success: true, coins: reward, newBalance: userStates[userId].coins });
+    userStates[userId].lastClaim = Date.now();
+
+    return res.json({ success: true, coins: userStates[userId].coins });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Internal error", error: error.message });
+    console.error("Error in /claim:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
-// 💰 Balance get
-app.get("/balance/:uid", (req, res) => {
+// /balance
+app.get("/balance", (req, res) => {
   try {
-    const uid = req.params.uid;
-    if (!userStates[uid]) userStates[uid] = { coins: 0, capsules: [] };
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "Missing userId" });
+    }
 
-    res.json({ success: true, coins: userStates[uid].coins });
+    const user = userStates[userId];
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.json({ success: true, coins: user.coins });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Internal error", error: error.message });
+    console.error("Error in /balance:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
-// 💰 Balance add
-app.post("/balance/:uid", (req, res) => {
+// /capsule
+app.post("/capsule", (req, res) => {
   try {
-    const uid = req.params.uid;
-    const { coins } = req.body;
-    if (!coins) return res.status(400).json({ success: false, message: "Missing coins value" });
+    const { userId, type } = req.body;
+    if (!userId || !type) {
+      return res.status(400).json({ success: false, message: "Missing userId or type" });
+    }
 
-    if (!userStates[uid]) userStates[uid] = { coins: 0, capsules: [] };
-    userStates[uid].coins += coins;
+    if (!userStates[userId]) {
+      userStates[userId] = { coins: 0, capsules: [], lastClaim: 0, referredBy: null };
+    }
 
-    res.json({ success: true, newBalance: userStates[uid].coins });
+    userStates[userId].capsules.push({ type, timestamp: Date.now() });
+
+    return res.json({ success: true, capsules: userStates[userId].capsules });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Internal error", error: error.message });
+    console.error("Error in /capsule:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
-// 📦 Capsule add
-app.post("/capsule/:uid", (req, res) => {
-  try {
-    const uid = req.params.uid;
-    const { type } = req.body;
-    if (!type) return res.status(400).json({ success: false, message: "Missing capsule type" });
-
-    if (!userStates[uid]) userStates[uid] = { coins: 0, capsules: [] };
-    userStates[uid].capsules.push({ type, added: Date.now() });
-
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Internal error", error: error.message });
-  }
+// Головна сторінка
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
-// 📦 Capsule get
-app.get("/capsule/:uid", (req, res) => {
-  try {
-    const uid = req.params.uid;
-    if (!userStates[uid]) userStates[uid] = { coins: 0, capsules: [] };
-
-    res.json({ success: true, capsules: userStates[uid].capsules });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Internal error", error: error.message });
-  }
-});
-
-// 🟢 Server launch
+// Запуск сервера
 app.listen(PORT, () => {
   console.log(`🟢 Server running at http://localhost:${PORT}`);
 });
