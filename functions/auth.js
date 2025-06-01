@@ -10,10 +10,16 @@ passport.deserializeUser((obj, done) => done(null, obj));
 passport.use(
   new DiscordStrategy(
     {
-    clientID: process.env.CLIENT_ID,
-clientSecret: process.env.CLIENT_SECRET,
-callbackURL: process.env.REDIRECT_URI,
-
+      clientID: process.env.DISCORD_CLIENT_ID,     // <--- ВИПРАВИТИ ТУТ
+      clientSecret: process.env.DISCORD_CLIENT_SECRET, // <--- ВИПРАВИТИ ТУТ
+      callbackURL: process.env.DISCORD_CALLBACK_URL,  // <--- ВИПРАВИТИ ТУТ
+      scope: ["identify"],
+    },
+    (accessToken, refreshToken, profile, done) => {
+      process.nextTick(() => done(null, profile));
+    }
+  )
+);
 
 
       scope: ["identify"],
