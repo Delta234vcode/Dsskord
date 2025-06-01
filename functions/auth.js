@@ -10,9 +10,10 @@ passport.deserializeUser((obj, done) => done(null, obj));
 passport.use(
   new DiscordStrategy(
     {
-      clientID: process.env.DISCORD_CLIENT_ID,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET,
-      callbackURL: process.env.DISCORD_CALLBACK_URL,
+    clientID: process.env.CLIENT_ID,
+clientSecret: process.env.CLIENT_SECRET,
+callbackURL: process.env.REDIRECT_URI,
+
 
 
       scope: ["identify"],
