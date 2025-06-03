@@ -24,6 +24,26 @@ let activatedReferralsCount = 0;
 let currentUserData = {}; 
 
 let currentLocale = 'en'; 
+let playerUID = null; // Глобальний UID користувача з Discord
+
+// Перевірка авторизації через Discord
+fetch("/auth/user")
+  .then((res) => {
+    if (!res.ok) throw new Error("Not authenticated");
+    return res.json();
+  })
+  .then((user) => {
+    console.log("✅ Logged in as Discord user:", user.username, "(ID:", user.id + ")");
+    playerUID = user.id;
+
+    // Можеш тут одразу викликати функції ініціалізації гри
+    // наприклад:
+    initializeGameForUser(playerUID);
+  })
+  .catch((err) => {
+    console.warn("❌ User not authenticated:", err);
+    showCustomMessage("Please login with Discord to play.", 3000);
+  });
 
 // --- DOM Elements ---
 const languageModal = document.getElementById('languageModal');
