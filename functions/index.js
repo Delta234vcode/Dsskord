@@ -1,180 +1,165 @@
 const path = require("path");
-require("dotenv").config(); // Assumes .env is in the same directory as index.js
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
-const authRoutes = require("./auth"); // Assuming auth.js is correctly set up
+const authRoutes = require("./auth");
+
+// 🔥 Firebase Admin SDK
+const admin = require("firebase-admin");
+const serviceAccount = require("./serviceAccountKey.json"); // 👈 створити файл через Firebase > Service Account
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ❗ IMPORTANT: Replace userStates with database logic (e.g., Firestore)
-// const userStates = {}; // This in-memory store will lose data on server restart.
-
-// --- Middleware ---
-// Configure CORS to allow requests from your specific frontend domain on Render
+// === CORS ===
 const corsOptions = {
-  origin: "https://dsskord.onrender.com", // 🔑 YOUR ACTUAL FRONTEND DOMAIN ON RENDER
+  origin: "https://dsskord.onrender.com",
   methods: ["GET", "POST"],
-  credentials: true, // Important for sessions/cookies
+  credentials: true,
 };
 app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
 
-app.use(express.json()); // To parse JSON request bodies
-app.use(express.static(path.join(__dirname, "../public"))); // Serve static files (frontend)
-
-// Session and Passport initialization
+// === Sessions & Passport ===
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "replace_this_super_secret_key_in_production", // 🔐 Use environment variable for secret
+    secret: process.env.SESSION_SECRET || "replace_this_secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // Send cookie only over HTTPS in production
-      httpOnly: true, // Helps prevent XSS
-      // sameSite: 'lax', // Consider for CSRF protection, may need 'none' if frontend/backend are different sites entirely and using credentials
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
     },
   })
 );
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Authentication routes from auth.js
 app.use("/auth", authRoutes);
 
-// ================== API ROUTES ===================
-// 💡 TODO: Replace all userStates logic with database operations (e.g., Firestore)
-
-// /tap
-app.post("/tap", async (req, res) => { // Changed to async if DB operations are needed
+// === /tap ===
+app.post("/tap", async (req, res) => {
   try {
-    const { userId, coins: tapAmount } = req.body; // Renamed coins to tapAmount for clarity
+    const { userId, coins: tapAmount } = req.body;
     if (!userId || typeof tapAmount !== "number") {
-      return res.status(400).json({ success: false, message: "Missing userId or coins (tapAmount)" });
+      return res.status(400).json({ success: false, message: "Missing userId or coins" });
     }
 
-    // --- DATABASE LOGIC START ---
-    // Example: Fetch user from DB, update coins, save user
-    // let user = await db.collection('users').doc(userId).get();
-    // if (!user.exists) {
-    //   await db.collection('users').doc(userId).set({ coins: tapAmount, capsules: [], lastClaim: 0, referredBy: null });
-    //   return res.json({ success: true, coins: tapAmount });
-    // } else {
-    //   const currentCoins = user.data().coins || 0;
-    //   const newCoins = currentCoins + tapAmount;
-    //   await db.collection('users').doc(userId).update({ coins: newCoins });
-    //   return res.json({ success: true, coins: newCoins });
-    // }
-    // --- DATABASE LOGIC END ---
-
-    // Current in-memory logic (for reference, to be replaced)
-    if (!userStates[userId]) {
-      userStates[userId] = { coins: 0, capsules: [], lastClaim: 0, referredBy: null };
+    const userRef = db.collection("users").doc(userId);
+    const doc = await userRef.get();
+    if (!doc.exists) {
+      await userRef.set({ coins: tapAmount, capsules: [], lastClaim: 0 });
+    } else {
+      const current = doc.data().coins || 0;
+      await userRef.update({ coins: current + tapAmount });
     }
-    userStates[userId].coins += tapAmount;
-    return res.json({ success: true, coins: userStates[userId].coins });
+
+    const updated = await userRef.get();
+    return res.json({ success: true, coins: updated.data().coins });
 
   } catch (error) {
     console.error("Error in /tap:", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal error" });
   }
 });
 
-// /claim
-app.post("/claim", async (req, res) => { // Changed to async
+// === /claim ===
+app.post("/claim", async (req, res) => {
   try {
     const { userId, reward } = req.body;
     if (!userId || typeof reward !== "number") {
       return res.status(400).json({ success: false, message: "Missing userId or reward" });
     }
 
-    // --- DATABASE LOGIC (similar to /tap) ---
-    // Fetch user, update coins and lastClaim, save user
-    // ---
-
-    // Current in-memory logic
-    if (!userStates[userId]) {
-      userStates[userId] = { coins: 0, capsules: [], lastClaim: 0, referredBy: null };
+    const userRef = db.collection("users").doc(userId);
+    const doc = await userRef.get();
+    if (!doc.exists) {
+      await userRef.set({ coins: reward, capsules: [], lastClaim: Date.now() });
+    } else {
+      const user = doc.data();
+      await userRef.update({
+        coins: (user.coins || 0) + reward,
+        lastClaim: Date.now(),
+      });
     }
-    userStates[userId].coins += reward;
-    userStates[userId].lastClaim = Date.now();
-    return res.json({ success: true, coins: userStates[userId].coins, lastClaim: userStates[userId].lastClaim }); // Added lastClaim to response
+
+    const updated = await userRef.get();
+    return res.json({
+      success: true,
+      coins: updated.data().coins,
+      lastClaim: updated.data().lastClaim,
+    });
 
   } catch (error) {
     console.error("Error in /claim:", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal error" });
   }
 });
 
-// /balance
-app.get("/balance", async (req, res) => { // Changed to async
+// === /balance ===
+app.get("/balance", async (req, res) => {
   try {
     const { userId } = req.query;
     if (!userId) {
       return res.status(400).json({ success: false, message: "Missing userId" });
     }
 
-    // --- DATABASE LOGIC ---
-    // Fetch user from DB and return coins
-    // let userDoc = await db.collection('users').doc(userId).get();
-    // if (!userDoc.exists) {
-    //   return res.status(404).json({ success: false, message: "User not found" });
-    // }
-    // return res.json({ success: true, coins: userDoc.data().coins || 0 });
-    // ---
-
-    // Current in-memory logic
-    const user = userStates[userId];
-    if (!user) {
+    const doc = await db.collection("users").doc(userId).get();
+    if (!doc.exists) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    return res.json({ success: true, coins: user.coins });
+
+    return res.json({ success: true, coins: doc.data().coins || 0 });
 
   } catch (error) {
     console.error("Error in /balance:", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal error" });
   }
 });
 
-// /capsule
-app.post("/capsule", async (req, res) => { // Changed to async
+// === /capsule ===
+app.post("/capsule", async (req, res) => {
   try {
     const { userId, type } = req.body;
     if (!userId || !type) {
       return res.status(400).json({ success: false, message: "Missing userId or type" });
     }
 
-    // --- DATABASE LOGIC ---
-    // Fetch user, add capsule to user's capsule array/collection, save user
-    // ---
-
-    // Current in-memory logic
-    if (!userStates[userId]) {
-      userStates[userId] = { coins: 0, capsules: [], lastClaim: 0, referredBy: null };
+    const userRef = db.collection("users").doc(userId);
+    const doc = await userRef.get();
+    if (!doc.exists) {
+      await userRef.set({ coins: 0, capsules: [{ type, timestamp: Date.now() }], lastClaim: 0 });
+    } else {
+      const user = doc.data();
+      const updatedCapsules = user.capsules || [];
+      updatedCapsules.push({ type, timestamp: Date.now() });
+      await userRef.update({ capsules: updatedCapsules });
     }
-    userStates[userId].capsules.push({ type, timestamp: Date.now() });
-    return res.json({ success: true, capsules: userStates[userId].capsules });
+
+    const updated = await userRef.get();
+    return res.json({ success: true, capsules: updated.data().capsules });
 
   } catch (error) {
     console.error("Error in /capsule:", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal error" });
   }
 });
 
-// Catch-all for serving the frontend's index.html (useful for SPAs with client-side routing)
+// === Catch all ===
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
-// Start server
+// === Start Server ===
 app.listen(PORT, () => {
-  console.log(`🟢 Server running at http://localhost:${PORT}`);
-  if (process.env.NODE_ENV !== 'production' && process.env.SESSION_SECRET === 'keyboard cat') {
-    console.warn('⚠️ WARNING: Default session secret "keyboard cat" is used. Change this for production!');
-  }
-  console.log(`🔑 Session secret configured: ${process.env.SESSION_SECRET ? 'From ENV' : '"keyboard cat" (default - insecure!)'}`);
-  console.log(`🌐 CORS configured for origin: ${corsOptions.origin}`);
-
+  console.log(`🟢 Server running on http://localhost:${PORT}`);
 });
