@@ -24,7 +24,7 @@ let activatedReferralsCount = 0;
 let currentUserData = {}; 
 
 let currentLocale = 'en'; 
-let playerUID = null; // Глобальний UID користувача з Discord
+   playerUID = null; // Глобальний UID користувача з Discord
 
 // Перевірка авторизації через Discord
 fetch("/auth/user")
