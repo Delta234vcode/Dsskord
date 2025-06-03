@@ -44,6 +44,20 @@ fetch("/auth/user")
     console.warn("❌ User not authenticated:", err);
     showCustomMessage("Please login with Discord to play.", 3000);
   });
+document.querySelectorAll('.language-button').forEach((button) => {
+  button.addEventListener('click', () => {
+    const selectedLang = button.getAttribute('data-lang');
+    if (typeof setLanguage === 'function') {
+      setLanguage(selectedLang);
+    } else {
+      console.warn("setLanguage function is not available.");
+    }
+
+    // Приховуємо мовне вікно після вибору мови
+    document.getElementById("languageModal").style.display = "none";
+    document.querySelector(".app-container").style.display = "flex";
+  });
+});
 
 // --- DOM Elements ---
 const languageModal = document.getElementById('languageModal');
