@@ -3,7 +3,7 @@ const translations = {
     en: {
         "energy_header": "Energy", "coins_header": "Coins", "rank_header": "Rank",
         "tap_the_capsule": "TAP THE VOID CAPSULE!", "passive_income_rate_display_template": "🔄 +{value} COINS/HOUR",
-        "cooldown_timer_prefix": "COOLDOWN", "cooldown_timer_format": "{h}:{m}:{s}",
+        "cooldown_timer_prefix": "COOLDOWN", "cooldown_timer_format": "{h}:{m}:{s}", // Цей формат не використовується прямо, але може бути корисним
         "inventory_title": "DATA VAULT // CAPSULES", "passive_income_label": "PASSIVE STREAM:", "no_capsules_message": "NO ARTIFACTS IN VAULT. KEEP TAPPING THE VOID.", "coins_per_hour_suffix": "COINS/HR",
         "leaderboard_title": "VOID RANKINGS // DAILY", "leaderboard_empty_message": "RANKINGS OFFLINE. BE THE FIRST AGENT.", "coins_suffix": "COINS", "leaderboard_reset_note": "Rankings reset 00:00 UTC.",
         "invite_title": "NETWORK // INVITE AGENTS", "your_invite_code_label": "Your Unique Agent ID:", "copy_button_id": "COPY ID", "referral_enter_code_label": "Enter Agent ID of your Referrer:", "confirm_button": "CONFIRM",
@@ -31,10 +31,13 @@ const translations = {
         "message_daily_reward_claimed_already": "DAILY CACHE ALREADY ACCESSED!", "message_daily_reward_coins_template": "ACQUIRED {value} COINS! (DAY {day})", "message_daily_reward_capsule_template": "🎉 ARTIFACT ACQUIRED: {value} CAPSULE! (DAY {day})",
         "message_leaderboard_reset": "RANKINGS RESET FOR NEW CYCLE!", "message_audio_load_error_template": "AUDIO OFFLINE: {soundName}. CHECK PATH/FORMAT.", "message_audio_play_error_template": "AUDIO PLAYBACK ERROR: {soundName}.",
         "message_storage_error": "COULD NOT SAVE GAME STATE. STORAGE ERROR.",
+        "message_user_not_authenticated_tap": "Please login to tap!", // Додано
+        "message_please_login_discord": "Please login with Discord to continue.", // Додано
+        "message_login_for_full_features": "Login for full features.", // Додано
         "nav_tap": "TAP", "nav_vault": "VAULT", "nav_ranks": "RANKS", "nav_network": "NETWORK", "nav_tasks": "TASKS",
         "capsule_silver": "SILVER", "capsule_gold": "GOLD", "capsule_diamond": "DIAMOND", "capsule_discord": "DISCORD",
         "daily_reward_text_coins_template": "+{value} COINS", "daily_reward_text_capsule_template": "🎁 {value} CAPSULE", "daily_reward_new_cycle_template": "+{value} COINS (New Cycle)",
-        "daily_claim": "Daily Claim" // Added for daily reward item display
+        "daily_claim": "Daily Reward" // Змінено для кращого узгодження
     },
     ru: {
         "energy_header": "Энергия", "coins_header": "Монеты", "rank_header": "Ранг",
@@ -67,17 +70,113 @@ const translations = {
         "message_daily_reward_claimed_already": "ЕЖЕДНЕВНАЯ НАГРАДА УЖЕ ПОЛУЧЕНА!", "message_daily_reward_coins_template": "ПОЛУЧЕНО {value} МОНЕТ! (ДЕНЬ {day})", "message_daily_reward_capsule_template": "🎉 АРТЕФАКТ ПОЛУЧЕН: {value} КАПСУЛА! (ДЕНЬ {day})",
         "message_leaderboard_reset": "РЕЙТИНГИ СБРОШЕНЫ ДЛЯ НОВОГО ЦИКЛА!", "message_audio_load_error_template": "АУДИО ОФФЛАЙН: {soundName}. ПРОВЕРЬ ПУТЬ/ФОРМАТ.", "message_audio_play_error_template": "ОШИБКА ВОСПРОИЗВЕДЕНИЯ АУДИО: {soundName}.",
         "message_storage_error": "НЕ УДАЛОСЬ СОХРАНИТЬ СОСТОЯНИЕ ИГРЫ. ОШИБКА ХРАНИЛИЩА.",
+        "message_user_not_authenticated_tap": "Пожалуйста, войдите, чтобы тапать!", // Додано
+        "message_please_login_discord": "Пожалуйста, войдите через Discord, чтобы продолжить.", // Додано
+        "message_login_for_full_features": "Войдите для доступа ко всем функциям.", // Додано
         "nav_tap": "ТАП", "nav_vault": "ХРАНИЛИЩЕ", "nav_ranks": "РАНГИ", "nav_network": "СЕТЬ", "nav_tasks": "ЗАДАНИЯ",
         "capsule_silver": "СЕРЕБРЯНАЯ", "capsule_gold": "ЗОЛОТАЯ", "capsule_diamond": "АЛМАЗНАЯ", "capsule_discord": "ДИСКОРД",
         "daily_reward_text_coins_template": "+{value} МОНЕТ", "daily_reward_text_capsule_template": "🎁 {value} КАПСУЛА", "daily_reward_new_cycle_template": "+{value} МОНЕТ (Новый Цикл)",
-        "daily_claim": "Ежедневная Награда" // Added for daily reward item display
+        "daily_claim": "Ежедневный Клейм" // Змінено для кращого узгодження
     }
 };
 
+let currentLocale = 'en'; // Мова за замовчуванням
 
 /**
- * Translates a key into the current language.
- * @param {string} locale The current locale (e.g., 'en', 'ru').
- * @param {string} key The key to translate.
- * @param {object} replacements An object of placeholder-value pairs for dynamic strings.
- * @returns {string} The translated string or
+ * Встановлює поточну мову та зберігає її у localStorage.
+ * @param {string} lang Код мови ('en' або 'ru').
+ */
+function setLanguage(lang) {
+    if (translations[lang]) {
+        currentLocale = lang;
+        localStorage.setItem('phonetap_locale', lang);
+        console.log(`Language set to: ${lang}`);
+        translatePage(); // Перекладаємо сторінку після зміни мови
+    } else {
+        console.warn(`Language ${lang} not found. Defaulting to 'en'.`);
+        currentLocale = 'en'; // Повертаємось до мови за замовчуванням, якщо вибрана не існує
+        localStorage.setItem('phonetap_locale', 'en');
+        translatePage();
+    }
+}
+
+/**
+ * Перекладає рядок за ключем для поточної або вказаної мови.
+ * @param {string} locale Поточна локаль (наприклад, 'en', 'ru').
+ * @param {string} key Ключ для перекладу.
+ * @param {object} [replacements] Об'єкт пар плейсхолдер-значення для динамічних рядків.
+ * @returns {string} Перекладений рядок або ключ, якщо переклад не знайдено.
+ */
+function t(locale, key, replacements = {}) {
+    let langToUse = translations[locale] ? locale : 'en'; // Використовуємо 'en' якщо локаль не знайдена
+
+    let text = translations[langToUse]?.[key] || translations['en']?.[key] || key; // Спочатку поточна, потім англійська, потім сам ключ
+
+    for (const placeholder in replacements) {
+        if (replacements.hasOwnProperty(placeholder)) {
+            text = text.replace(new RegExp(`{${placeholder}}`, 'g'), replacements[placeholder]);
+        }
+    }
+    return text;
+}
+
+/**
+ * Оновлює текстовий вміст елементів на сторінці відповідно до поточної мови.
+ */
+function translatePage() {
+    console.log(`Translating page to: ${currentLocale}`);
+    document.querySelectorAll('[data-translate-key]').forEach(element => {
+        const key = element.getAttribute('data-translate-key');
+        let replacements = {};
+        if (element.dataset.translateValue) { // Для динамічних значень, якщо вони є
+             replacements.value = element.dataset.translateValue;
+        }
+        if (element.dataset.translateDay) {
+            replacements.day = element.dataset.translateDay;
+        }
+         if (element.dataset.translateHours) {
+            replacements.hours = element.dataset.translateHours;
+        }
+        if (element.dataset.translateMinutes) {
+            replacements.minutes = element.dataset.translateMinutes;
+        }
+        if (element.dataset.translateSoundname) {
+            replacements.soundName = element.dataset.translateSoundname;
+        }
+        if (element.dataset.translateType) {
+            replacements.type = element.dataset.translateType;
+        }
+        if (element.dataset.translateRewardText) {
+             replacements.reward_text = element.dataset.translateRewardText;
+        }
+
+
+        const translatedText = t(currentLocale, key, replacements);
+
+        // Для input[type="text"] та подібних, встановлюємо placeholder
+        if (element.tagName === 'INPUT' && element.hasAttribute('placeholder') && element.hasAttribute('data-placeholder-key')) {
+            const placeholderKey = element.getAttribute('data-placeholder-key');
+            element.placeholder = t(currentLocale, placeholderKey);
+        } else {
+             // Для елементів, що містять HTML (наприклад, через innerHTML з перекладу)
+            if (translatedText.includes('<') && translatedText.includes('>')) {
+                element.innerHTML = translatedText;
+            } else {
+                element.textContent = translatedText;
+            }
+        }
+    });
+}
+
+// Ініціалізація: спроба завантажити збережену мову при завантаженні скрипта.
+// Але основний виклик setLanguage та translatePage має відбуватися після завантаження DOM,
+// тому preInitialize в game.js є кращим місцем для цього.
+// Тут можна залишити встановлення currentLocale, якщо це потрібно до DOMContentLoaded.
+const savedLocaleOnLoad = localStorage.getItem('phonetap_locale');
+if (savedLocaleOnLoad && translations[savedLocaleOnLoad]) {
+    currentLocale = savedLocaleOnLoad;
+}
+
+// Переконайтеся, що ці функції доступні глобально для game.js, якщо localization.js завантажується першим.
+// Якщо game.js може завантажитися раніше, ці функції мають бути експортовані або game.js має чекати на їх готовність.
+// Оскільки вони оголошені глобально (без модулів), вони мають бути доступні, якщо localization.js завантажений перед game.js.
