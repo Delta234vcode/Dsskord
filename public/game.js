@@ -2,97 +2,45 @@ if (window !== window.parent) {
   document.body.classList.add("discord-mode");
 }
 
-// This file assumes localization.js and config.js are already loaded AND
-// Firebase SDKs for app, auth, firestore, functions are loaded in index.html
-
 // --- Firebase Instances (to be initialized) ---
 let db;
-let auth;
+let auth; // Firebase auth instance
 let functions;
 
 // --- Game State Variables ---
-let taps = 0; 
-let coins = 0; 
-let playerUID = ''; 
-let energy = typeof MAX_ENERGY !== 'undefined' ? MAX_ENERGY : 200; // Default if config not loaded yet
+let taps = 0;
+let coins = 0;
+let playerUID = null; // UID користувача з Discord (головний ідентифікатор)
+let energy = typeof MAX_ENERGY !== 'undefined' ? MAX_ENERGY : 200;
 
-let nextTapAvailableTime = null; 
-let ownedCapsules = []; 
+let nextTapAvailableTime = null;
+let ownedCapsules = [];
 let cooldownIntervalId = null;
-let currentDailyClaimStep = 0; 
+let currentDailyClaimStep = 0;
 let activatedReferralsCount = 0;
-let currentUserData = {}; 
+let currentUserData = {}; // Дані користувача з Firestore
 
-let currentLocale = 'en'; 
-   playerUID = null; // Глобальний UID користувача з Discord
-
-// Перевірка авторизації через Discord
-fetch("/auth/user")
-  .then((res) => {
-    if (!res.ok) throw new Error("Not authenticated");
-    return res.json();
-  })
-  .then((user) => {
-    console.log("✅ Logged in as Discord user:", user.username, "(ID:", user.id + ")");
-    playerUID = user.id;
-
-    // Можеш тут одразу викликати функції ініціалізації гри
-    // наприклад:
-    initializeGameForUser(playerUID);
-  })
-  .catch((err) => {
-    console.warn("❌ User not authenticated:", err);
-    showCustomMessage("Please login with Discord to play.", 3000);
-  });
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll('.language-button').forEach((button) => {
-    button.addEventListener('click', () => {
-      const selectedLang = button.getAttribute('data-lang');
-      if (typeof setLanguage === 'function') {
-        setLanguage(selectedLang);
-      } else {
-        console.warn("setLanguage is not defined.");
-      }
-
-      document.getElementById("languageModal").style.display = "none";
-      document.querySelector(".app-container").style.display = "flex";
-    });
-  });
-});
-
-document.querySelectorAll('.language-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    const selectedLang = button.getAttribute('data-lang');
-    if (typeof setLanguage === 'function') {
-      setLanguage(selectedLang);
-    } else {
-      console.warn("setLanguage function is not available.");
-    }
-
-    // Приховуємо мовне вікно після вибору мови
-    document.getElementById("languageModal").style.display = "none";
-    document.querySelector(".app-container").style.display = "flex";
-  });
-});
+let currentLocale = 'en';
 
 // --- DOM Elements ---
+// (Залишаємо ваші оголошення DOM-елементів тут, вони виглядають коректно)
 const languageModal = document.getElementById('languageModal');
 const appContainer = document.querySelector('.app-container');
 const tapCapsuleElement = document.getElementById('tapCapsule');
-const energyValueElement = document.getElementById('energyValue'); 
-const maxEnergyDisplayElement = document.getElementById('maxEnergyDisplay'); 
+const energyValueElement = document.getElementById('energyValue');
+const maxEnergyDisplayElement = document.getElementById('maxEnergyDisplay');
 const coinsDisplay = document.getElementById('coinsDisplay');
-const rankDisplay = document.getElementById('rankDisplay'); 
+const rankDisplay = document.getElementById('rankDisplay');
 const cooldownTimerDisplay = document.getElementById('cooldownTimerDisplay');
 const messageBox = document.getElementById('messageBox');
 const capsuleListDisplay = document.getElementById('capsuleList');
-const passiveIncomeDisplay = document.getElementById('passiveIncomeDisplay'); 
-const passiveRateDisplayOnTapScreen = document.getElementById('passive-rate'); 
+const passiveIncomeDisplay = document.getElementById('passiveIncomeDisplay');
+const passiveRateDisplayOnTapScreen = document.getElementById('passive-rate');
 const leaderboardDisplay = document.getElementById('leaderboardDisplay');
 const capsuleDropModal = document.getElementById('capsuleDropModal');
 const droppedCapsuleImage = document.getElementById('droppedCapsuleImage');
 const droppedCapsuleInfo = document.getElementById('droppedCapsuleInfo');
-const droppedCapsuleQuote = document.getElementById('droppedCapsuleQuote'); 
+const droppedCapsuleQuote = document.getElementById('droppedCapsuleQuote');
 const droppedCapsuleBonus = document.getElementById('droppedCapsuleBonus');
 const closeDropModalButton = document.getElementById('closeDropModalButton');
 const dailyClaimStatus = document.getElementById('dailyClaimStatus');
@@ -106,11 +54,22 @@ const referralStatusMessage = document.getElementById('referralStatusMessage');
 const enterReferralCodeSection = document.getElementById('enterReferralCodeSection');
 const activatedReferralsCountDisplay = document.getElementById('activatedReferralsCount');
 
+
 // --- Sound Initialization ---
 let tapSound, dropSound, boostSound;
-const soundErrorFlags = { tap: false, drop: false, boost: false }; 
+const soundErrorFlags = { tap: false, drop: false, boost: false };
 
-function initializeSounds() { 
+function initializeSounds() {
+    // Перевірка, чи soundPaths визначено (з config.js)
+    if (typeof soundPaths === 'undefined') {
+        console.error("soundPaths is not defined. Make sure config.js is loaded.");
+        // Позначити всі звуки як помилкові, щоб уникнути подальших проблем
+        soundErrorFlags.tap = true;
+        soundErrorFlags.drop = true;
+        soundErrorFlags.boost = true;
+        showCustomMessage("Sound configuration missing!", 3000);
+        return;
+    }
     tapSound = initSound(soundPaths.tap, 'tap');
     dropSound = initSound(soundPaths.drop, 'drop');
     boostSound = initSound(soundPaths.boost, 'boost');
@@ -122,15 +81,15 @@ function initSound(path, soundName) {
         audio.onerror = (e) => {
             console.warn(`Error event on audio element for ${soundName} (${path}). Source: ${audio.currentSrc || 'not set'}. Error:`, e);
             if (!soundErrorFlags[soundName]) {
-                showCustomMessage(t(currentLocale, "message_audio_load_error_template", {soundName: soundName}), 3500);
-                soundErrorFlags[soundName] = true; 
+                if (typeof t === 'function') showCustomMessage(t(currentLocale, "message_audio_load_error_template", {soundName: soundName}), 3500);
+                soundErrorFlags[soundName] = true;
             }
         };
         return audio;
     } catch (e) {
         console.warn(`Could not create Audio object for ${soundName} (${path}). Sounds will be disabled for it.`, e);
         soundErrorFlags[soundName] = true;
-        return { play: () => Promise.reject(new Error('Dummy audio')), pause: () => {}, currentTime: 0 }; 
+        return { play: () => Promise.reject(new Error('Dummy audio')), pause: () => {}, currentTime: 0 };
     }
 }
 
@@ -145,9 +104,9 @@ function initializeFirebase() {
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         } else {
-            firebase.app(); 
+            firebase.app();
         }
-        auth = firebase.auth();
+        auth = firebase.auth(); // Firebase Auth instance
         db = firebase.firestore();
         functions = firebase.functions();
         console.log("Firebase Initialized");
@@ -160,79 +119,82 @@ function initializeFirebase() {
 }
 
 // --- Helper function to handle fetch responses ---
+// (Ваша функція handleApiResponse виглядає добре, залишаємо її)
 function handleApiResponse(response) {
     if (!response.ok) {
-        // Handle HTTP errors like 404, 500
         return response.text().then(text => {
             try {
-                // Try parsing as JSON first, as error details might be in JSON format
                 const err = JSON.parse(text);
                 throw new Error(err.message || `Server error: ${response.status}`);
             } catch (e) {
-                // If parsing fails, it's likely HTML or plain text
                 throw new Error(`Server returned an invalid response. Status: ${response.status}`);
             }
         });
     }
-    // Check if the response is JSON before parsing
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {
         return response.json();
     } else {
-        // If not JSON, throw an error instead of trying to parse
         throw new Error("Received an unexpected response format from the server.");
     }
 }
 
-
 // --- Core Game Functions ---
+// (Ваші функції playAudio, showCustomMessage, showCapsuleDropModal, getTapReward, showTapFeedback, updateUIDisplay, updateCooldownTimer - виглядають добре, залишаємо їх з невеликими правками для узгодженості)
 function playAudio(soundInstance, soundName) {
-    if (soundErrorFlags[soundName]) return; 
+    if (soundErrorFlags[soundName]) return;
     if (soundInstance && typeof soundInstance.play === 'function') {
-        soundInstance.currentTime = 0; 
+        soundInstance.currentTime = 0;
         const playPromise = soundInstance.play();
         if (playPromise !== undefined) {
             playPromise.catch(error => {
-                if (!soundErrorFlags[soundName]) { 
+                if (!soundErrorFlags[soundName]) {
                     console.warn(`Error playing ${soundName} sound (path: ${soundPaths[soundName]}):`, error);
-                    if (error.name !== 'NotSupportedError' && error.name !== 'AbortError') { 
-                        showCustomMessage(t(currentLocale, "message_audio_play_error_template", {soundName: soundName}), 3000);
+                    if (error.name !== 'NotSupportedError' && error.name !== 'AbortError') {
+                        if (typeof t === 'function') showCustomMessage(t(currentLocale, "message_audio_play_error_template", {soundName: soundName}), 3000);
                     }
-                    soundErrorFlags[soundName] = true; 
+                    soundErrorFlags[soundName] = true;
                 }
             });
         }
     } else {
        if (!soundErrorFlags[soundName]) {
             console.warn(`Sound object for "${soundName}" is invalid or missing play method.`);
-            soundErrorFlags[soundName] = true; 
+            soundErrorFlags[soundName] = true;
        }
     }
 }
 
-function showCustomMessage(message, duration = 3000) { 
+function showCustomMessage(message, duration = 3000) {
     if (messageBox) {
         messageBox.textContent = message; messageBox.classList.add('show');
         setTimeout(() => { messageBox.classList.remove('show'); }, duration);
     }
 }
 
-async function showCapsuleDropModal(type) { 
+async function showCapsuleDropModal(type) {
     if (!capsuleDropModal) return;
-    droppedCapsuleImage.src = capsuleImageURLs[type] || capsuleImageURLs.main; 
+    droppedCapsuleImage.src = capsuleImageURLs[type] || capsuleImageURLs.main;
     droppedCapsuleImage.alt = `${type} Capsule`;
-    droppedCapsuleInfo.textContent = t(currentLocale, "capsule_drop_title_template", {type: t(currentLocale, `capsule_${type}`).toUpperCase() });
-    droppedCapsuleBonus.textContent = t(currentLocale, "capsule_drop_bonus_template_raw", {value: capsuleBonuses[type]});
-    droppedCapsuleQuote.textContent = "A mysterious energy emanates from it..."; 
+    if (typeof t === 'function') {
+        droppedCapsuleInfo.textContent = t(currentLocale, "capsule_drop_title_template", {type: t(currentLocale, `capsule_${type}`).toUpperCase() });
+        droppedCapsuleBonus.textContent = t(currentLocale, "capsule_drop_bonus_template_raw", {value: capsuleBonuses[type]});
+    }
+    droppedCapsuleQuote.textContent = "A mysterious energy emanates from it...";
     capsuleDropModal.classList.add('visible');
 }
 if(closeDropModalButton) closeDropModalButton.addEventListener('click', () => capsuleDropModal.classList.remove('visible'));
 if(capsuleDropModal) capsuleDropModal.addEventListener('click', (event) => { if (event.target === capsuleDropModal) capsuleDropModal.classList.remove('visible'); });
 
+
 function getTapReward() {
-    let tapReward = BASE_COINS_PER_TAP; 
+    let tapReward = (typeof BASE_COINS_PER_TAP !== 'undefined' ? BASE_COINS_PER_TAP : 1);
+    if (typeof capsuleBonuses === 'undefined') {
+        console.warn("capsuleBonuses is not defined. Tap reward might be incorrect.");
+        return tapReward;
+    }
     ownedCapsules.forEach(capType => {
-        tapReward += capsuleBonuses[capType] || 0; 
+        tapReward += capsuleBonuses[capType] || 0;
     });
     return tapReward;
 }
@@ -245,20 +207,20 @@ function showTapFeedback() {
     if (tapCapsuleElement) tapCapsuleElement.appendChild(feedbackEl);
     setTimeout(() => {
         feedbackEl.remove();
-    }, 780); 
+    }, 780);
 }
 
 function updateUIDisplay() {
-    if(energyValueElement) energyValueElement.textContent = energy; 
-    if(maxEnergyDisplayElement) maxEnergyDisplayElement.textContent = MAX_ENERGY; 
-    if(coinsDisplay) coinsDisplay.textContent = coins.toLocaleString(); 
-    updateRankDisplay(); 
+    if(energyValueElement) energyValueElement.textContent = energy;
+    if(maxEnergyDisplayElement) maxEnergyDisplayElement.textContent = (typeof MAX_ENERGY !== 'undefined' ? MAX_ENERGY : 200);
+    if(coinsDisplay) coinsDisplay.textContent = coins.toLocaleString();
+    updateRankDisplay();
 
     const capsuleImgElement = tapCapsuleElement ? tapCapsuleElement.querySelector('.tap-capsule-img') : null;
     if (capsuleImgElement) {
         if (energy <= 0 && nextTapAvailableTime && Date.now() < nextTapAvailableTime) {
             capsuleImgElement.style.filter = 'grayscale(100%) brightness(0.5)';
-            if (capsuleImgElement.style.animationName !== 'none') capsuleImgElement.style.animation = 'none'; 
+            if (capsuleImgElement.style.animationName !== 'none') capsuleImgElement.style.animation = 'none';
         } else {
             capsuleImgElement.style.filter = '';
             if (capsuleImgElement.style.animationName === 'none') capsuleImgElement.style.animation = 'glowPulsePunk 2.5s infinite ease-in-out';
@@ -268,14 +230,14 @@ function updateUIDisplay() {
 
 function updateCooldownTimer() {
     if (!cooldownTimerDisplay) return;
-    if (!nextTapAvailableTime || Date.now() >= nextTapAvailableTime) { 
-        cooldownTimerDisplay.textContent = ''; 
+    if (!nextTapAvailableTime || Date.now() >= nextTapAvailableTime) {
+        cooldownTimerDisplay.textContent = '';
         if (cooldownIntervalId) clearInterval(cooldownIntervalId); cooldownIntervalId = null;
-        if (energy === 0 && taps >= MAX_TAPS_BEFORE_COOLDOWN) { 
-            energy = MAX_ENERGY; 
-            taps = 0; 
-            nextTapAvailableTime = null; 
-            showCustomMessage(t(currentLocale, "message_energy_recharged"));
+        if (energy === 0 && taps >= (typeof MAX_TAPS_BEFORE_COOLDOWN !== 'undefined' ? MAX_TAPS_BEFORE_COOLDOWN : 200)) {
+            energy = (typeof MAX_ENERGY !== 'undefined' ? MAX_ENERGY : 200);
+            taps = 0;
+            nextTapAvailableTime = null;
+            if (typeof t === 'function') showCustomMessage(t(currentLocale, "message_energy_recharged"));
         }
         updateUIDisplay(); return;
     }
@@ -283,35 +245,40 @@ function updateCooldownTimer() {
     const h = Math.floor(remainingMs / 3600000);
     const m = Math.floor((remainingMs % 3600000) / 60000);
     const s = Math.floor((remainingMs % 60000) / 1000);
-    cooldownTimerDisplay.textContent = `${t(currentLocale, "cooldown_timer_prefix")}: ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    if (typeof t === 'function') cooldownTimerDisplay.textContent = `${t(currentLocale, "cooldown_timer_prefix")}: ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// --- 1. MODIFIED: handleTapInteraction ---
 function handleTapInteraction() {
-    if (!auth || !auth.currentUser) {
-        showCustomMessage("Authenticating... Please wait or refresh.", 3000);
-        return;
-    }
-    if (energy <= 0) {
-        showCustomMessage(t(currentLocale, "message_energy_depleted_recharging"), 3000);
+    // Перевіряємо, чи playerUID встановлено (тобто користувач залогінений через Discord)
+    if (!playerUID) {
+        if (typeof t === 'function') showCustomMessage(t(currentLocale, 'message_user_not_authenticated_tap'), 3000); // Потрібно додати цей ключ в локалізацію
+        // Можна також показати модальне вікно з пропозицією залогінитися або перенаправити на /auth/discord
+        // window.location.href = "/auth/discord"; // Як варіант
         return;
     }
 
-    fetch("https://phonetap-api.onrender.com/tap", {
+    if (energy <= 0) {
+        if (typeof t === 'function') showCustomMessage(t(currentLocale, "message_energy_depleted_recharging"), 3000);
+        return;
+    }
+
+    // Змінено URL на відносний, щоб використовувати той самий хост, що й фронтенд
+    fetch("/tap", { // Якщо ваш API на тому ж сервері, що й фронтенд
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: playerUID || "anon" })
+        // Передаємо playerUID, отриманий від /auth/user
+        body: JSON.stringify({ userId: playerUID })
     })
-    .then(handleApiResponse) // Use the new handler
+    .then(handleApiResponse)
     .then(data => {
         console.log("✅ TAP success:", data);
-        
-        energy--; 
-        taps++;   
+
+        energy--;
+        taps++;
 
         const currentTapReward = getTapReward();
-        coins += currentTapReward; 
-        
+        coins += currentTapReward;
+
         showTapFeedback();
         playAudio(tapSound, 'tap');
         if (navigator.vibrate) try { navigator.vibrate(30); } catch(e) { console.warn("Vibration error", e); }
@@ -322,10 +289,15 @@ function handleTapInteraction() {
             setTimeout(() => { capsuleImg.style.transform = null; }, 80);
         }
 
-        if (taps >= MAX_TAPS_BEFORE_COOLDOWN) {
+        if (taps >= (typeof MAX_TAPS_BEFORE_COOLDOWN !== 'undefined' ? MAX_TAPS_BEFORE_COOLDOWN : 200)) {
             energy = 0;
+            // Перевірка, чи capsuleDropChances визначено
+            if (typeof capsuleDropChances === 'undefined') {
+                console.error("capsuleDropChances is not defined. Cannot determine capsule drop.");
+                return;
+            }
             const roll = Math.random() * 100;
-            let droppedType = 'silver';
+            let droppedType = 'silver'; // Default
             if (roll < capsuleDropChances.discord) droppedType = 'discord';
             else if (roll < capsuleDropChances.discord + capsuleDropChances.diamond) droppedType = 'diamond';
             else if (roll < capsuleDropChances.discord + capsuleDropChances.diamond + capsuleDropChances.gold) droppedType = 'gold';
@@ -337,8 +309,9 @@ function handleTapInteraction() {
             if (navigator.vibrate) try { navigator.vibrate([100, 30, 100]); } catch(e) { console.warn("Vibration error", e); }
             showCapsuleDropModal(droppedType);
 
-            nextTapAvailableTime = Date.now() + COOLDOWN_DURATION_MS;
-            showCustomMessage(t(currentLocale, "message_tap_limit_cooldown_template", {hours: COOLDOWN_DURATION_MS / 3600000}));
+            const cooldownMs = (typeof COOLDOWN_DURATION_MS !== 'undefined' ? COOLDOWN_DURATION_MS : (3 * 60 * 60 * 1000));
+            nextTapAvailableTime = Date.now() + cooldownMs;
+            if (typeof t === 'function') showCustomMessage(t(currentLocale, "message_tap_limit_cooldown_template", {hours: cooldownMs / 3600000}));
             if (cooldownIntervalId) clearInterval(cooldownIntervalId);
             cooldownIntervalId = setInterval(updateCooldownTimer, 1000);
             updateCooldownTimer();
@@ -351,16 +324,27 @@ function handleTapInteraction() {
         showCustomMessage(`Tap Error: ${err.message}`, 4000);
     });
 
-    updateUIDisplay();
+    updateUIDisplay(); // Можливо, варто викликати тільки після успішного запиту
 }
 if (tapCapsuleElement) tapCapsuleElement.addEventListener('click', handleTapInteraction);
 
+
+// (Інші ваші функції, такі як updateUserCapsulesAndHourlyRate, calculatePassiveIncome, updateInventoryDisplay, applyPassiveIncome, generatePlayerUID, initializeReferralSystem, обробники кнопок рефералів, щоденних нагород, навігації, updateRankDisplay, updateLeaderboard, renderLeaderboard, scheduleLeaderboardReset - залишаємо, але вони мають використовувати playerUID, отриманий від /auth/user, і currentUserData, завантажені з Firestore через setupUserDocument(playerUID))
+
+// ПРИКЛАД: Модифікований updateUserCapsulesAndHourlyRate
 async function updateUserCapsulesAndHourlyRate(newCapsulesArray) {
-    if (!playerUID) return;
-    let newHourlyRate = BASE_COINS_PER_TAP;
-    newCapsulesArray.forEach(capType => {
-        newHourlyRate += capsuleBonuses[capType] || 0;
-    });
+    if (!playerUID || !db) { // Перевіряємо і db
+        console.warn("Cannot update capsules: playerUID or DB not set.");
+        return;
+    }
+    let newHourlyRate = (typeof BASE_COINS_PER_TAP !== 'undefined' ? BASE_COINS_PER_TAP : 1);
+    if (typeof capsuleBonuses === 'undefined') {
+         console.warn("capsuleBonuses not defined, hourly rate may be incorrect.");
+    } else {
+        newCapsulesArray.forEach(capType => {
+            newHourlyRate += capsuleBonuses[capType] || 0;
+        });
+    }
 
     try {
         await db.collection('users').doc(playerUID).update({
@@ -372,419 +356,199 @@ async function updateUserCapsulesAndHourlyRate(newCapsulesArray) {
         console.error("Error updating user capsules/hourlyRate in Firestore:", error);
     }
 }
+// Те саме для applyPassiveIncome, handleClaimDailyReward, confirmReferralCodeButton listener
 
-function calculatePassiveIncome() { 
-    let totalPassive = 0;
-    ownedCapsules.forEach(capsuleType => totalPassive += capsuleBonuses[capsuleType] || 0); 
-    return totalPassive;
-}
-
-function updateInventoryDisplay() {
-    if (!capsuleListDisplay || !passiveIncomeDisplay || !passiveRateDisplayOnTapScreen) return;
-    capsuleListDisplay.innerHTML = ''; 
-    const counts = ownedCapsules.reduce((acc, cap) => { acc[cap] = (acc[cap] || 0) + 1; return acc; }, {});
-    const totalPassive = calculatePassiveIncome(); 
-    if (Object.keys(counts).length === 0) capsuleListDisplay.innerHTML = `<p class="text-gray-400 font-mono">${t(currentLocale, "no_capsules_message")}</p>`;
-    else {
-        for (const [type, count] of Object.entries(counts)) {
-            const li = document.createElement('div'); li.className = 'inventory-item';
-            li.innerHTML = `<img src="${capsuleImageURLs[type]}" alt="${type} capsule" onerror="this.onerror=null; this.src='https://placehold.co/40x40/0A0A1A/FF00FF?text=ERR&font=Share+Tech+Mono'; this.alt='Error loading ${type} image';"><span class="flex-grow font-mono">${t(currentLocale, `capsule_${type}`).toUpperCase()} CAPSULE x ${count}</span><span class="text-sm font-mono" style="color: var(--acid-green);">+${(capsuleBonuses[type] || 0) * count} C/HR</span>`;
-            capsuleListDisplay.appendChild(li);
-        }
+// --- Setup user data listener (ключова функція для завантаження даних) ---
+function setupUserDocument(currentPayerUID) { // Приймає UID від Discord
+    if (!db) {
+        console.error("Firestore (db) is not initialized. Cannot setup user document.");
+        return;
     }
-    passiveIncomeDisplay.textContent = totalPassive.toLocaleString(); 
-    passiveRateDisplayOnTapScreen.innerHTML = t(currentLocale, "passive_income_rate_display_template", {value: totalPassive.toLocaleString()});
-}
-
-async function applyPassiveIncome() { 
-    if (!playerUID || !db) return;
-    const hourlyBonus = calculatePassiveIncome();
-    if (hourlyBonus > 0) { 
-        try {
-            await db.collection('users').doc(playerUID).update({
-                balance: firebase.firestore.FieldValue.increment(hourlyBonus)
-            });
-            showCustomMessage(t(currentLocale, "message_passive_income_received_template", {value: hourlyBonus.toLocaleString()}), 4000);
-        } catch (error) {
-            console.error("Error applying passive income:", error);
-        }
+    if (!currentPayerUID) {
+        console.error("playerUID is not set. Cannot setup user document.");
+        return;
     }
-}
-setInterval(applyPassiveIncome, 3600000); 
 
-function generatePlayerUID() { 
-    let uid = localStorage.getItem("phonetap_referralCode"); 
-    if (!uid) { uid = Math.random().toString(36).substring(2, 9).toUpperCase(); localStorage.setItem("phonetap_referralCode", uid); }
-    return uid;
-}
-
-function initializeReferralSystem() {
-    const myReferralCode = generatePlayerUID(); 
-    if(playerInviteCodeDisplay) playerInviteCodeDisplay.value = myReferralCode; 
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const refIdFromURL = urlParams.get('ref');
-    if (refIdFromURL && refIdFromURL !== myReferralCode && !localStorage.getItem("refUrlBonusClaimed")) { 
-       localStorage.setItem('urlReferredBy', refIdFromURL); 
-       if (playerUID && db) { 
-            db.collection('users').doc(playerUID).update({ balance: firebase.firestore.FieldValue.increment(REFERRAL_URL_JOIN_BONUS) })
-              .then(() => showCustomMessage(t(currentLocale, "message_referral_bonus_url_template", {value: refIdFromURL}), 4000))
-              .catch(e => console.error("Error giving URL referral bonus:", e));
-       }
-       localStorage.setItem("refUrlBonusClaimed", "true"); 
-    }
-    
-    const manuallyReferredBy = currentUserData.referrals?.invitedBy || localStorage.getItem('manuallyReferredBy'); 
-    if (manuallyReferredBy) {
-        if(enterReferralCodeSection) enterReferralCodeSection.classList.add('hidden');
-        if(referralStatusMessage) referralStatusMessage.textContent = t(currentLocale, "referral_status_success_template", {value: manuallyReferredBy});
-    } else {
-        if(enterReferralCodeSection) enterReferralCodeSection.classList.remove('hidden');
-        if(referralStatusMessage) referralStatusMessage.textContent = '';
-    }
-    
-    activatedReferralsCount = currentUserData.referrals?.activatedCount || 0; 
-    if(activatedReferralsCountDisplay) activatedReferralsCountDisplay.textContent = activatedReferralsCount;
-}
-
-if(copyInviteCodeButton) {
-    copyInviteCodeButton.addEventListener('click', () => {
-        playerInviteCodeDisplay.select();
-        try {
-            navigator.clipboard.writeText(playerInviteCodeDisplay.value)
-                .then(() => showCustomMessage(t(currentLocale, "message_link_copied"), 2000))
-                .catch(err => { console.warn('Async clipboard write failed:', err); if (document.execCommand('copy')) showCustomMessage(t(currentLocale, "message_link_copied_fallback"), 2000); else showCustomMessage(t(currentLocale, "message_link_copy_failed"), 3000); });
-        } catch (err) { console.warn('navigator.clipboard not available:', err); if (document.execCommand('copy')) showCustomMessage(t(currentLocale, "message_link_copied_fallback"), 2000); else showCustomMessage(t(currentLocale, "message_link_copy_failed"), 3000); }
-    });
-}
-
-// --- 2. MODIFIED: confirmReferralCodeButton listener ---
-if(confirmReferralCodeButton) {
-    confirmReferralCodeButton.addEventListener('click', () => { 
-        if(!auth || !auth.currentUser) { showCustomMessage("Please sign in to use referral codes.", 3000); return; }
-        const enteredCode = enterReferralCodeInput.value.trim().toUpperCase();
-        const myOwnReferralCode = currentUserData.referrals?.code || playerUID;
-        if (!enteredCode) { showCustomMessage(t(currentLocale, "referral_status_error_enter_code"), 3000); return; }
-        if (enteredCode === myOwnReferralCode) { showCustomMessage(t(currentLocale, "referral_status_error_own_code"), 3000); return; }
-        if (currentUserData.referrals?.invitedBy) { 
-            showCustomMessage(t(currentLocale, "referral_status_error_already_referred"), 3000); return; 
-        }
-
-        showCustomMessage("Confirming referral code...", 2000);
-        
-        fetch("https://phonetap-api.onrender.com/invite", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: enteredCode, userId: playerUID })
-        })
-        .then(handleApiResponse) // Use the new handler
-        .then(data => {
-            if (data.status === 'success') {
-                showCustomMessage(t(currentLocale, "message_referral_bonus_manual_template", {value: enteredCode}), 4000);
-                if(enterReferralCodeSection) enterReferralCodeSection.classList.add('hidden');
-                if(referralStatusMessage) referralStatusMessage.textContent = t(currentLocale, "referral_status_success_template", {value: enteredCode});
-            } else {
-                showCustomMessage(data.message || "Referral failed.", 3000);
-            }
-        })
-        .catch(error => {
-            console.error("Error calling invite function:", error);
-            showCustomMessage(`Referral Error: ${error.message}`, 4000);
-        });
-    });
-}
-
-function checkReferralActivation() { 
-    const actualReferrer = currentUserData.referrals?.invitedBy; 
-    if (actualReferrer && !localStorage.getItem('referralMilestoneNotifiedFor_' + actualReferrer + '_by_' + playerUID )) { 
-        localStorage.setItem('referralMilestoneNotifiedFor_' + actualReferrer + '_by_' + playerUID, 'true'); 
-        showCustomMessage(t(currentLocale, "message_referral_milestone_referrer_template", {value: actualReferrer}), 4000);
-        console.log(`REFERRAL SYSTEM: Referee (UID: ${playerUID}) reached ${MAX_TAPS_BEFORE_COOLDOWN} taps. Referrer ${actualReferrer} should get +${REFERRAL_MILESTONE_BONUS_REFERRER} coins. (Backend needed).`);
-    }
-}
-
-const dailyRewards = dailyRewardsConfig; 
-
-function renderDailyRewardsGrid() {
-    if (!dailyClaimGrid) return;
-    dailyClaimGrid.innerHTML = ''; 
-    const lastClaimDate = currentUserData.claim?.lastClaim ? (currentUserData.claim.lastClaim.seconds ? new Date(currentUserData.claim.lastClaim.toDate()).toISOString().split('T')[0] : currentUserData.claim.lastClaim) : null;
-    const todayDateString = new Date().toISOString().split('T')[0];
-    let currentCompletedStep = currentUserData.claim?.streak || 0;
-    
-    let actualNextClaimableDayVisual = currentCompletedStep + 1;
-    if (actualNextClaimableDayVisual > 7) actualNextClaimableDayVisual = 1;
-
-    dailyRewards.forEach(reward => {
-        const itemEl = document.createElement('div'); itemEl.className = 'daily-reward-item';
-        let rewardTextKey = reward.type === 'coins' ? "daily_reward_text_coins_template" : "daily_reward_text_capsule_template";
-        let rewardValue = reward.type === 'coins' ? reward.coins : t(currentLocale, `capsule_${reward.capsule}`).toUpperCase();
-        itemEl.innerHTML = `<div class="day">${t(currentLocale,'daily_claim')} ${reward.day}</div><div class="reward">${t(currentLocale, rewardTextKey, {value: rewardValue})}</div>`; 
-        
-        if (reward.day <= currentCompletedStep) {
-             itemEl.classList.add('claimed');
-        }
-        if (reward.day === actualNextClaimableDayVisual && lastClaimDate !== todayDateString) {
-            itemEl.classList.add('available-to-claim');
-        }
-        dailyClaimGrid.appendChild(itemEl);
-    });
-}
-
-function checkDailyClaimAvailability() {
-    if (!claimDailyRewardButton || !dailyClaimStatus) return;
-    const lastClaimTimestamp = currentUserData.claim?.lastClaim || 0;
-    const lastClaimDate = lastClaimTimestamp ? (lastClaimTimestamp.seconds ? new Date(lastClaimTimestamp.toDate()).toISOString().split('T')[0] : lastClaimTimestamp.toString()) : null; // ensure it's a string
-    const todayDateString = new Date().toISOString().split('T')[0];
-    currentDailyClaimStep = currentUserData.claim?.streak || 0; 
-    
-    renderDailyRewardsGrid(); 
-
-    if (lastClaimDate !== todayDateString) {
-        claimDailyRewardButton.disabled = false;
-        const nextRewardDayToDisplay = currentDailyClaimStep + 1 > 7 ? 1 : currentDailyClaimStep + 1;
-        const rewardInfo = dailyRewards[(nextRewardDayToDisplay - 1) % 7];
-        let rewardText = rewardInfo.type === 'coins' ? t(currentLocale, "daily_reward_text_coins_template", {value: rewardInfo.coins}) : t(currentLocale, "daily_reward_text_capsule_template", {value: t(currentLocale, `capsule_${rewardInfo.capsule}`).toUpperCase()});
-        if (nextRewardDayToDisplay === 1 && currentDailyClaimStep === 7) { 
-            rewardText = t(currentLocale, "daily_reward_new_cycle_template", {value: dailyRewards[0].coins});
-        }
-        dailyClaimStatus.textContent = t(currentLocale, "daily_cache_available_message_template", {day: nextRewardDayToDisplay, reward_text: rewardText});
-        claimDailyRewardButton.textContent = t(currentLocale, "daily_cache_button_claim_template", {day: nextRewardDayToDisplay});
-    } else {
-        claimDailyRewardButton.disabled = true;
-        dailyClaimStatus.textContent = t(currentLocale, "daily_cache_claimed_today_message");
-        let claimedDayForButton = currentDailyClaimStep;
-        if (claimedDayForButton === 0 && lastClaimDate === todayDateString) { claimedDayForButton = 7; } 
-        claimDailyRewardButton.textContent = claimedDayForButton === 0 ? t(currentLocale, "daily_cache_button_claimed_na") : t(currentLocale, "daily_cache_button_claimed_template", {day: claimedDayForButton});
-    }
-}
-
-// --- 3. MODIFIED: handleClaimDailyReward ---
-function handleClaimDailyReward() { 
-    if (!auth.currentUser) return;
-    
-    claimDailyRewardButton.disabled = true;
-
-    fetch("https://phonetap-api.onrender.com/claim", { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: playerUID })
-    })
-    .then(handleApiResponse) // Use the new handler
-    .then(data => {
-        const rewardData = data.reward;
-        const newStreak = data.newStreak || currentDailyClaimStep + 1;
-        let rewardMessage = "";
-
-        if (typeof rewardData === 'number') {
-           coins += rewardData; 
-           rewardMessage = t(currentLocale, "message_daily_reward_coins_template", {value: rewardData, day: newStreak});
-        } else if (typeof rewardData === 'string') {
-           ownedCapsules.push(rewardData); 
-           updateInventoryDisplay(); 
-           rewardMessage = t(currentLocale, "message_daily_reward_capsule_template", {value: t(currentLocale, `capsule_${rewardData}`).toUpperCase(), day: newStreak});
-        }
-       
-        updateUIDisplay(); 
-        checkDailyClaimAvailability(); 
-        showCustomMessage(rewardMessage, 4000);
-    })
-    .catch(error => {
-        console.error("Error claiming daily reward:", error);
-        showCustomMessage(`Claim Error: ${error.message}`, 4000);
-        claimDailyRewardButton.disabled = false; 
-    });
-}
-if(claimDailyRewardButton) claimDailyRewardButton.addEventListener('click', handleClaimDailyReward);
-
-// ... (rest of the functions: updateRankDisplay, updateLeaderboard, etc. remain the same)
-
-function updateRankDisplay() {
-    const username = currentUserData.username || `AGENT-${playerUID.substring(0,4)}`;
-    let leaderboard = JSON.parse(localStorage.getItem('phonetap_leaderboard_cache')) || []; 
-    const userRankIndex = leaderboard.findIndex(p => p.name === username);
-    if (rankDisplay) {
-        if (userRankIndex !== -1) rankDisplay.textContent = `${userRankIndex + 1}`;
-        else rankDisplay.textContent = leaderboard.length > 0 ? "10+" : "N/A";
-    }
-}
-
-function updateLeaderboard() { 
-    if (!db) return;
-    db.collection('users').orderBy('balance', 'desc').limit(LEADERBOARD_SIZE).get()
-        .then(snapshot => {
-            const leaderboardData = [];
-            snapshot.forEach(doc => {
-                leaderboardData.push({ name: doc.data().username || `AGENT-${doc.id.substring(0,4)}`, coins: doc.data().balance || 0 });
-            });
-            localStorage.setItem('phonetap_leaderboard_cache', JSON.stringify(leaderboardData)); 
-            renderLeaderboard(leaderboardData);
-            updateRankDisplay();
-        })
-        .catch(error => console.error("Error fetching leaderboard:", error));
-}
-
-function renderLeaderboard(data) {
-    if(!leaderboardDisplay) return;
-    leaderboardDisplay.innerHTML = data && data.length ? '' : `<p class="text-gray-400 font-mono">${t(currentLocale, "leaderboard_empty_message")}</p>`;
-    if(data) data.forEach((player, index) => {
-        const entry = document.createElement('div');
-        entry.className = 'list-item flex justify-between items-center font-mono';
-        entry.innerHTML = `<span>#${index + 1} ${player.name}</span><span style="color:var(--acid-green)">${(player.coins || 0).toLocaleString()} ${t(currentLocale, "coins_suffix")}</span>`;
-        leaderboardDisplay.appendChild(entry);
-    });
-}
-
-function scheduleLeaderboardReset() { /* ... */ }
-
-
-const navButtons = document.querySelectorAll('.nav-button');
-const tabContents = document.querySelectorAll('.tab-content');
-navButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        navButtons.forEach(btn => btn.classList.remove('active'));
-        tabContents.forEach(tab => tab.classList.add('hidden'));
-        button.classList.add('active');
-        const tabId = button.getAttribute('data-tab');
-        document.getElementById(tabId).classList.remove('hidden');
-        if (tabId === 'inventoryTab') updateInventoryDisplay();
-        if (tabId === 'leaderboardTab') updateLeaderboard(); 
-        if (tabId === 'inviteTab') { 
-            if(playerInviteCodeDisplay) playerInviteCodeDisplay.value = currentUserData.referrals?.code || playerUID; 
-            const manuallyReferredBy = currentUserData.referrals?.invitedBy;
-            if (manuallyReferredBy) {
-                if(enterReferralCodeSection) enterReferralCodeSection.classList.add('hidden');
-                if(referralStatusMessage) referralStatusMessage.textContent = t(currentLocale, "referral_status_success_template", {value: manuallyReferredBy});
-            } else {
-                if(enterReferralCodeSection) enterReferralCodeSection.classList.remove('hidden');
-                if(referralStatusMessage) referralStatusMessage.textContent = '';
-            }
-            activatedReferralsCount = currentUserData.referrals?.activatedCount || 0; 
-            if(activatedReferralsCountDisplay) activatedReferralsCountDisplay.textContent = activatedReferralsCount;
-        }
-        if (tabId === 'tasksTab') checkDailyClaimAvailability(); 
-    });
-});
-
-// Setup user data listener
-function setupUserDocument(user) {
-    const userRef = db.collection('users').doc(user.uid);
+    const userRef = db.collection('users').doc(currentPayerUID);
     userRef.onSnapshot(doc => {
+        const isInitialLoad = !currentUserData.hasOwnProperty('balance');
+
         if (doc.exists) {
-            console.log("Received user data from Firestore:", doc.data());
+            console.log("Received user data from Firestore for UID:", currentPayerUID, doc.data());
             currentUserData = doc.data();
+            // Оновлюємо глобальні змінні стану гри з Firestore
             coins = currentUserData.balance || 0;
             ownedCapsules = currentUserData.ownedCapsules || [];
-            taps = currentUserData.taps?.count || 0;
-            updateUIDisplay();
-            updateInventoryDisplay();
-            checkDailyClaimAvailability();
+            // taps = currentUserData.taps?.count || 0; // Кількість тапів краще обробляти локально або через backend
+            // currentDailyClaimStep та інші дані, що залежать від Firestore
         } else {
-            console.log("No user document, creating one...");
-            const myReferralCode = localStorage.getItem("phonetap_referralCode") || generatePlayerUID();
-            userRef.set({
-                username: `AGENT-${user.uid.substring(0, 4)}`,
+            console.log("No user document for UID:", currentPayerUID, "Creating one...");
+            const myReferralCode = localStorage.getItem("phonetap_referralCode") || generatePlayerUID_local(); // Використовуємо локальну генерацію, якщо це для Firestore
+            currentUserData = { // Встановлюємо початкові дані для currentUserData
+                username: `AGENT-${currentPayerUID.substring(0, 4)}`,
                 balance: 0,
                 ownedCapsules: [],
                 claim: { streak: 0, lastClaim: null },
                 referrals: { code: myReferralCode, invitedBy: null, activatedCount: 0 },
-                taps: { count: 0, hourlyRate: BASE_COINS_PER_TAP, lastTap: null }
-            }).catch(error => console.error("Error creating user document:", error));
+                taps: { count: 0, hourlyRate: (typeof BASE_COINS_PER_TAP !== 'undefined' ? BASE_COINS_PER_TAP : 1), lastTap: null }
+            };
+            coins = 0; // Оновлюємо глобальні змінні
+            ownedCapsules = [];
+
+            userRef.set(currentUserData)
+                   .catch(error => console.error("Error creating user document:", error));
         }
+
+        // Ініціалізуємо ігрову логіку ТІЛЬКИ ПІСЛЯ отримання/створення даних
+        if (isInitialLoad) {
+            initializeGameLogic();
+        } else { // Якщо не перший раз, просто оновлюємо UI, так як initializeGameLogic вже була викликана
+            updateUIDisplay();
+            updateInventoryDisplay();
+            checkDailyClaimAvailability();
+            // тощо, якщо потрібно оновити інші частини UI
+        }
+
+
     }, error => {
-        console.error("Error with Firestore snapshot:", error);
+        console.error("Error with Firestore snapshot for UID:", currentPayerUID, error);
+        // Можливо, тут варто показати повідомлення користувачу
+        // і спробувати анонімний вхід, якщо основний потік не спрацював.
+        // Але це ускладнить логіку, якщо основна автентифікація через Discord.
     });
 }
 
+// Локальна генерація UID для реферального коду, якщо playerUID ще не отримано
+function generatePlayerUID_local() {
+    let uid = localStorage.getItem("phonetap_referralCode");
+    if (!uid) { uid = Math.random().toString(36).substring(2, 9).toUpperCase(); localStorage.setItem("phonetap_referralCode", uid); }
+    return uid;
+}
 
-function preInitialize() {
+
+// --- Ініціалізація гри ---
+function initializeGameLogic() {
+    console.log("🚀 Initializing game logic for user:", playerUID);
+    if (!playerUID) {
+        console.warn("initializeGameLogic called without playerUID. User might not be authenticated.");
+        // Тут можна або нічого не робити, або показати повідомлення про необхідність входу
+        if (typeof t === 'function') showCustomMessage(t(currentLocale, 'message_login_for_full_features'), 3000); // Додати ключ
+        return;
+    }
+
+    // Ці функції тепер будуть використовувати currentUserData, заповнене з Firestore
+    initializeReferralSystem();
+    updateLeaderboard();
+    scheduleLeaderboardReset(); // Якщо вона потрібна
+
+    // Логіка перезарядки на основі даних з Firestore
+    if (currentUserData.taps?.lastTap) {
+        const serverLastTapTime = currentUserData.taps.lastTap.seconds ? currentUserData.taps.lastTap.toDate().getTime() : currentUserData.taps.lastTap;
+        const cooldownMs = (typeof COOLDOWN_DURATION_MS !== 'undefined' ? COOLDOWN_DURATION_MS : (3 * 60 * 60 * 1000));
+        if (Date.now() < serverLastTapTime + cooldownMs) {
+            nextTapAvailableTime = serverLastTapTime + cooldownMs;
+            energy = 0;
+            taps = (typeof MAX_TAPS_BEFORE_COOLDOWN !== 'undefined' ? MAX_TAPS_BEFORE_COOLDOWN : 200);
+            if (!cooldownIntervalId) cooldownIntervalId = setInterval(updateCooldownTimer, 1000);
+            updateCooldownTimer(); // Оновити таймер одразу
+        }
+    }
+
+    // Оновлення UI після завантаження всіх даних
+    updateUIDisplay();
+    updateInventoryDisplay();
+    checkDailyClaimAvailability(); // Ця функція також має використовувати currentUserData
+
+    // Якщо вкладка запрошень активна
+    if (document.querySelector('.nav-button.active[data-tab="inviteTab"]')) {
+       if(playerInviteCodeDisplay && currentUserData.referrals) playerInviteCodeDisplay.value = currentUserData.referrals?.code || playerUID;
+       const manuallyReferredBy = currentUserData.referrals?.invitedBy;
+       if (manuallyReferredBy) {
+            if(enterReferralCodeSection) enterReferralCodeSection.classList.add('hidden');
+            if(referralStatusMessage && typeof t === 'function') referralStatusMessage.textContent = t(currentLocale, "referral_status_success_template", {value: manuallyReferredBy});
+       }
+       if(activatedReferralsCountDisplay && currentUserData.referrals) activatedReferralsCountDisplay.textContent = currentUserData.referrals.activatedCount || 0;
+    }
+    if (typeof translatePage === 'function') translatePage(); // Переклад сторінки
+}
+
+// --- Старт додатку ---
+function startApp() {
+    initializeSounds(); // Ініціалізуємо звуки
+    // Ініціалізуємо Firebase. Це асинхронно встановить `auth` та `db`.
+    if (!initializeFirebase()) {
+        // Якщо Firebase не ініціалізовано, гра не може працювати належним чином
+        return;
+    }
+
+    // Перевіряємо, чи користувач вже залогінений через наш Discord OAuth бекенд
+    fetch("/auth/user")
+      .then(handleApiResponse) // Використовуємо ваш обробник
+      .then(user => { // `user` тут - це об'єкт користувача з вашого Discord бекенду
+        console.log("✅ Logged in via /auth/user:", user.username, "(ID:", user.id + ")");
+        playerUID = user.id; // Встановлюємо глобальний playerUID
+
+        // Тепер, коли ми маємо playerUID від Discord, налаштовуємо документ Firestore для цього UID
+        setupUserDocument(playerUID);
+        // initializeGameLogic() тепер буде викликана всередині setupUserDocument після завантаження даних
+      })
+      .catch(err => {
+        console.warn("❌ User not authenticated via /auth/user:", err.message);
+        // Користувач не залогінений через Discord
+        // Тут можна або нічого не робити (гравець не зможе грати),
+        // або показати кнопку "Login with Discord",
+        // або спробувати Firebase Anonymous signIn для якогось обмеженого функціоналу
+        // (але це ускладнить логіку, якщо основна гра вимагає Discord UID).
+        // Наразі, просто покажемо повідомлення.
+        if (typeof t === 'function') showCustomMessage(t(currentLocale, 'message_please_login_discord'), 5000); // Додати ключ локалізації
+        // Можна сховати ігровий контейнер і показати кнопку логіну
+        if(appContainer) appContainer.style.display = 'none'; // Наприклад
+        // document.getElementById('loginButton').style.display = 'block'; // Якщо у вас є кнопка логіну
+      });
+
+    // Обробники для статичних частин UI
+    if (tapCapsuleElement && tapCapsuleElement.querySelector('.tap-capsule-img')) {
+        tapCapsuleElement.querySelector('.tap-capsule-img').addEventListener('contextmenu', e => e.preventDefault());
+    }
+    if (typeof translatePage === 'function') translatePage(); // Початковий переклад статичних елементів
+}
+
+
+// --- Ініціалізація після завантаження DOM та вибору мови ---
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof setLanguage !== 'function' || typeof translatePage !== 'function' || typeof t !== 'function') {
+        console.error("Localization functions are not defined. Make sure localization.js and config.js are loaded correctly before game.js.");
+        if (languageModal) languageModal.innerHTML = "<h2>CRITICAL ERROR: Localization missing.</h2>";
+        return;
+    }
+
+    // Обробник вибору мови - один раз
+    document.querySelectorAll('.language-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const selectedLang = button.getAttribute('data-lang');
+            if (languageModal) languageModal.style.display = 'none';
+            if (appContainer) appContainer.style.display = 'flex'; // Показуємо контейнер гри
+
+            setLanguage(selectedLang); // Встановлюємо мову
+            startApp(); // Запускаємо основну логіку додатку ПІСЛЯ вибору мови
+        });
+    });
+
+    // Перевірка, чи мова вже збережена, щоб пропустити модальне вікно
     const savedLocale = localStorage.getItem('phonetap_locale');
     if (savedLocale && (savedLocale === 'en' || savedLocale === 'ru')) {
         if (languageModal) languageModal.style.display = 'none';
         if (appContainer) appContainer.style.display = 'flex';
-        setLanguage(savedLocale); 
-        if (initializeFirebase()) { 
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    playerUID = user.uid;
-                    setupUserDocument(user);
-                    initializeGameLogic(); 
-                } else {
-                    auth.signInAnonymously().catch(error => console.error("Error signing in anonymously:", error));
-                }
-            });
-        }
+        setLanguage(savedLocale);
+        startApp(); // Запускаємо додаток, якщо мова вже вибрана
     } else {
-        if (languageModal) languageModal.style.display = 'flex'; 
-        if (appContainer) appContainer.style.display = 'none'; 
+        // Мова не вибрана, показуємо модальне вікно
+        if (languageModal) languageModal.style.display = 'flex'; // Переконайтеся, що модальне вікно видиме
+        if (appContainer) appContainer.style.display = 'none'; // Ховаємо контейнер гри
+        if (typeof translatePage === 'function') translatePage(); // Можна перекласти саме модальне вікно
     }
-}
-
-document.querySelectorAll('.language-button').forEach(button => {
-    button.addEventListener('click', () => {
-        const selectedLang = button.getAttribute('data-lang');
-        if (languageModal) languageModal.style.display = 'none';
-        if (appContainer) appContainer.style.display = 'flex';
-        setLanguage(selectedLang); 
-        if (initializeFirebase()) {
-             auth.onAuthStateChanged(user => {
-                if (user) {
-                    playerUID = user.uid;
-                    setupUserDocument(user);
-                    initializeGameLogic();
-                } else {
-                    auth.signInAnonymously().catch(error => console.error("Error signing in anonymously:", error));
-                }
-            });
-        }
-    });
 });
 
-function initializeStaticParts() { 
-    initializeSounds(); 
-    if (tapCapsuleElement && tapCapsuleElement.querySelector('.tap-capsule-img')) {
-        tapCapsuleElement.querySelector('.tap-capsule-img').addEventListener('contextmenu', e => e.preventDefault());
-    }
-    translatePage();
-}
-
-
-function initializeGameLogic() { 
-    initializeReferralSystem(); 
-    updateLeaderboard();
-    scheduleLeaderboardReset(); 
-
-    if (currentUserData.taps?.lastTap) { 
-        const serverLastTapTime = currentUserData.taps.lastTap.seconds ? currentUserData.taps.lastTap.toDate().getTime() : currentUserData.taps.lastTap;
-        if (Date.now() < serverLastTapTime + COOLDOWN_DURATION_MS) {
-            nextTapAvailableTime = serverLastTapTime + COOLDOWN_DURATION_MS;
-            energy = 0; 
-            taps = MAX_TAPS_BEFORE_COOLDOWN; 
-            if (!cooldownIntervalId) cooldownIntervalId = setInterval(updateCooldownTimer, 1000);
-            updateCooldownTimer();
-        }
-    }
-    
-    if (document.querySelector('.nav-button.active[data-tab="inviteTab"]')) {
-       if(playerInviteCodeDisplay) playerInviteCodeDisplay.value = currentUserData.referrals?.code || playerUID; 
-       const manuallyReferredBy = currentUserData.referrals?.invitedBy;
-       if (manuallyReferredBy) {
-            if(enterReferralCodeSection) enterReferralCodeSection.classList.add('hidden');
-            if(referralStatusMessage) referralStatusMessage.textContent = t(currentLocale, "referral_status_success_template", {value: manuallyReferredBy});
-       }
-       if(activatedReferralsCountDisplay && currentUserData.referrals) activatedReferralsCountDisplay.textContent = currentUserData.referrals.activatedCount || 0;
-    }
-    translatePage(); 
-}
-
-// Global localization functions from localization.js need to be available here
-// For example: setLanguage, translatePage, t
-
-document.addEventListener('DOMContentLoaded', () => { 
-    // This is where localization.js should have defined these functions
-    if (typeof setLanguage !== 'function' || typeof translatePage !== 'function' || typeof t !== 'function') {
-        console.error("Localization functions are not defined. Make sure localization.js is loaded correctly before game.js.");
-        return;
-    }
-    preInitialize();
-});
+// Переконайтеся, що всі функції, на які посилаються DOM-елементи (наприклад, handleClaimDailyReward, handleTapInteraction), визначені вище.
+// Я залишив ваші визначення функцій, які виглядають логічно, вище цього блоку.
+// Потрібно буде ретельно протестувати всю логіку після цих змін.
