@@ -10,9 +10,9 @@ passport.deserializeUser((obj, done) => done(null, obj));
 passport.use(
   new DiscordStrategy(
     {
-      clientID: 1376165214206296215,
-      clientSecret: 47bosZXw9aH66ZhJFWA2H_eqLkB3CKrET,
-      callbackURL: https://dsskord.onrender.com/auth/discord/callback,
+      clientID: process.env.CLIENT_ID,
+clientSecret: process.env.CLIENT_SECRET,
+callbackURL: process.env.REDIRECT_URI,
       scope: ["identify"], // Залишаємо один scope
     },
     (accessToken, refreshToken, profile, done) => { // Залишаємо один verify callback
