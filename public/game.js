@@ -74,6 +74,7 @@ document.querySelectorAll('.language-button').forEach((button) => {
     document.querySelector(".app-container").style.display = "flex";
   });
 });
+import { db, auth } from "./firebase.js";
 
 // --- DOM Elements ---
 const languageModal = document.getElementById('languageModal');
