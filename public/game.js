@@ -44,6 +44,22 @@ fetch("/auth/user")
     console.warn("❌ User not authenticated:", err);
     showCustomMessage("Please login with Discord to play.", 3000);
   });
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('.language-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      const selectedLang = button.getAttribute('data-lang');
+      if (typeof setLanguage === 'function') {
+        setLanguage(selectedLang);
+      } else {
+        console.warn("setLanguage is not defined.");
+      }
+
+      document.getElementById("languageModal").style.display = "none";
+      document.querySelector(".app-container").style.display = "flex";
+    });
+  });
+});
+
 document.querySelectorAll('.language-button').forEach((button) => {
   button.addEventListener('click', () => {
     const selectedLang = button.getAttribute('data-lang');
