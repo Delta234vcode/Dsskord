@@ -2,6 +2,8 @@ const express = require("express");
 const passport = require("passport");
 const DiscordStrategy = require("passport-discord").Strategy;
 const admin = require("firebase-admin"); // Потрібен для взаємодії з Firestore
+// const admin = require("firebase-admin"); // Можна видалити, якщо admin напряму не використовується
+const { db } = require("./firebaseAdmin"); // <--- ДОДАЙТЕ ЦЕЙ РЯДОК
 
 const router = express.Router();
 const db = admin.firestore(); // Екземпляр Firestore
