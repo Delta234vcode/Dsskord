@@ -1,12 +1,10 @@
 const express = require("express");
 const passport = require("passport");
 const DiscordStrategy = require("passport-discord").Strategy;
-const admin = require("firebase-admin"); // Потрібен для взаємодії з Firestore
-// const admin = require("firebase-admin"); // Можна видалити, якщо admin напряму не використовується
-const { db } = require("./firebaseAdmin"); // <--- ДОДАЙТЕ ЦЕЙ РЯДОК
+// const admin = require("firebase-admin"); // Цей рядок можна видалити, якщо admin більше ніде не використовується напряму
+const { db } = require("./firebaseAdmin"); // Імпортуємо db з нашого модуля
 
 const router = express.Router();
-const db = admin.firestore(); // Екземпляр Firestore
 
 // Ці функції тепер важливі для правильної роботи сесій з базою даних
 passport.serializeUser((user, done) => {
