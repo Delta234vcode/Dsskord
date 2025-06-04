@@ -1,22 +1,35 @@
-// firebaseAdmin.js
-// ----------------
-// Цей файл відповідає за ініціалізацію Firebase Admin SDK.
-// Використовує Secret File, який Render розміщує у контейнері за шляхом /etc/secrets/functionsserviceAccountKey.json
+// functions/firebaseAdmin.js
 
 const admin = require("firebase-admin");
 
-// Завантажуємо Service Account JSON із Secret File Render
-// (переконайтесь, що в Render → Secret Files є functionsserviceAccountKey.json з коректним JSON)
-const serviceAccount = require("/etc/secrets/functionsserviceAccountKey.json");
+// ===
+// 1) Підтягуємо Secret File з Render. 
+//    Після того як ви в Render → Secret Files додали файл 
+//    з іменем exactly "functionsserviceAccountKey.json" і вставили туди весь JSON
+//    від Firebase (service account), він з’явиться у контейнері за шляхом /etc/secrets/.
+// ===
+let serviceAccount;
+try {
+  serviceAccount = require("/etc/secrets/functionsserviceAccountKey.json");
+} catch (err) {
+  console.error(
+    "FIREBASEADMIN.JS: Не вдалося знайти secrets-файл. Переконайтеся, що в Render → Secret Files є файл 'functionsserviceAccountKey.json' із повним JSON."
+  );
+  console.error(err);
+  process.exit(1);
+}
 
+// ===
+// 2) Ініціалізуємо Firebase Admin SDK з сертифікатом із секретного JSON.
+// ===
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  // Якщо ви також використовуєте Realtime Database, можна додати:
-  // databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+  // Якщо ви також використовуєте Realtime Database, розкоментуйте рядок нижче:
+  // databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`,
 });
 
-// Інстанція Firestore
+// ===
+// 3) Експортуємо інстанцію Firestore (db) і сам admin (щоб можна було брати FieldValue).
+// ===
 const db = admin.firestore();
-
-// Експортуємо і db, і admin (щоб у інших файлах можна було зробити FieldValue тощо)
 module.exports = { db, admin };
