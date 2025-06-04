@@ -1,23 +1,14 @@
 const path = require("path");
-// Завантажує змінні з .env файлу, що знаходиться в тій самій директорії (functions/)
-require("dotenv").config();
+require("dotenv").config(); // Завантажує змінні з .env файлу, що знаходиться в тій самій директорії
+
+// Імпортуємо db (та authAdmin, якщо він вам потрібен в index.js) з firebaseAdmin.js
+const { db /*, authAdmin */ } = require("./firebaseAdmin");
 
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
 const authRoutes = require("./auth"); // Файл з логікою Passport
-
-// Ініціалізація Firebase Admin SDK для роботи з Firestore
-const admin = require("firebase-admin");
-// 💥 ВАЖЛИВО: Переконайтеся, що файл serviceAccountKey.json знаходиться у директорії functions/
-// і його додано до .gitignore, щоб не потрапив у репозиторій!
-const serviceAccount = require("./serviceAccountKey.json");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-const db = admin.firestore(); // Екземпляр Firestore
 
 const app = express();
 const PORT = process.env.PORT || 3000;
